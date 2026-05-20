@@ -281,37 +281,8 @@ export function OrderBuilder({ cafeId, cafe, categories }: Props) {
           </div>
         </div>
 
-        {/* Cart panel (mobile inline below) ─────────────────────────────── */}
-        <div className="lg:hidden">
-          <CartPanel
-            cartLines={cartLines}
-            itemCount={itemCount}
-            subtotalPaise={subtotalPaise}
-            taxPaise={taxPaise}
-            totalPaise={totalPaise}
-            gstRateBp={gstRateBp}
-            tableLabel={tableLabel}
-            setTableLabel={setTableLabel}
-            customerName={customerName}
-            setCustomerName={setCustomerName}
-            customerPhone={customerPhone}
-            setCustomerPhone={setCustomerPhone}
-            notes={notes}
-            setNotes={setNotes}
-            error={error}
-            submitting={submitting}
-            onIncrement={(id) => {
-              const line = cart.get(id);
-              if (line) setQuantity(id, line.quantity + 1);
-            }}
-            onDecrement={(id) => {
-              const line = cart.get(id);
-              if (line) setQuantity(id, line.quantity - 1);
-            }}
-            onRemove={removeItem}
-            onSubmit={handleSubmit}
-          />
-        </div>
+        {/* On mobile the cart lives only in the slide-up drawer (below),
+            opened by the floating pill — no redundant inline copy. */}
       </div>
 
       {/* Mobile floating cart toggle ─────────────────────────────────────── */}
@@ -606,7 +577,7 @@ function CartPanel(props: CartPanelProps) {
                       disabled={line.quantity <= 1}
                       aria-label={`Decrease ${line.menuItem.name}`}
                       className={cn(
-                        'size-9 grid place-items-center rounded-md border border-border bg-bg',
+                        'size-11 grid place-items-center rounded-md border border-border bg-bg',
                         'text-fg hover:bg-subtle transition-colors',
                         'disabled:opacity-40 disabled:cursor-not-allowed',
                       )}
@@ -622,7 +593,7 @@ function CartPanel(props: CartPanelProps) {
                       disabled={line.quantity >= MAX_QTY}
                       aria-label={`Increase ${line.menuItem.name}`}
                       className={cn(
-                        'size-9 grid place-items-center rounded-md border border-border bg-bg',
+                        'size-11 grid place-items-center rounded-md border border-border bg-bg',
                         'text-fg hover:bg-subtle transition-colors',
                         'disabled:opacity-40 disabled:cursor-not-allowed',
                       )}

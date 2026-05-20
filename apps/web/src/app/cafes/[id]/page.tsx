@@ -183,13 +183,9 @@ export default async function CafeDashboardPage({ params }: PageProps) {
         <Card>
           <CardHeader className="flex items-center justify-between gap-4">
             <CardTitle>Cafe info</CardTitle>
-            <Link
-              href="#"
-              title="Coming soon"
-              className="text-xs text-muted hover:text-fg transition-colors"
-            >
-              Edit cafe
-            </Link>
+            <span className="text-[10px] uppercase tracking-wider text-muted font-medium px-2 py-0.5 rounded-full border border-border">
+              Edit · soon
+            </span>
           </CardHeader>
           <CardBody>
             <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-4">

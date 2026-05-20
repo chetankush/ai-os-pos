@@ -18,6 +18,12 @@ export default async function CafesLayout({
 
   return (
     <div className="min-h-dvh flex flex-col">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:border-border focus:bg-bg focus:px-4 focus:py-2 focus:text-sm focus:shadow-md"
+      >
+        Skip to content
+      </a>
       <header className="sticky top-0 z-30 border-b border-border bg-bg/80 backdrop-blur supports-[backdrop-filter]:bg-bg/60">
         <div className="mx-auto max-w-6xl px-6 py-3 flex items-center justify-between">
           <Link href="/cafes" className="inline-flex items-center gap-2">
@@ -42,7 +48,7 @@ export default async function CafesLayout({
         </div>
       </header>
 
-      <main className="flex-1">
+      <main id="main-content" className="flex-1">
         <div className="mx-auto max-w-6xl px-6 py-10">{children}</div>
       </main>
 
