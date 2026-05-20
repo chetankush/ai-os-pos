@@ -435,13 +435,16 @@ function MenuItemButton({
     >
       <div className="flex items-start gap-2.5">
         <span
-          aria-hidden
+          role="img"
+          aria-label={item.isVegetarian ? 'Vegetarian' : 'Non-vegetarian'}
+          title={item.isVegetarian ? 'Vegetarian' : 'Non-vegetarian'}
           className={cn(
-            'mt-0.5 size-3 rounded-sm border-2 flex items-center justify-center shrink-0',
+            'mt-0.5 size-3.5 rounded-sm border-2 flex items-center justify-center shrink-0',
             item.isVegetarian ? 'border-success' : 'border-danger',
           )}
         >
           <span
+            aria-hidden
             className={cn(
               'size-1.5 rounded-full',
               item.isVegetarian ? 'bg-success' : 'bg-danger',
@@ -558,7 +561,12 @@ function CartPanel(props: CartPanelProps) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span
-                        aria-hidden
+                        role="img"
+                        aria-label={
+                          line.menuItem.isVegetarian
+                            ? 'Vegetarian'
+                            : 'Non-vegetarian'
+                        }
                         className={cn(
                           'size-2.5 rounded-sm border-2 flex items-center justify-center shrink-0',
                           line.menuItem.isVegetarian
@@ -567,6 +575,7 @@ function CartPanel(props: CartPanelProps) {
                         )}
                       >
                         <span
+                          aria-hidden
                           className={cn(
                             'size-1 rounded-full',
                             line.menuItem.isVegetarian

@@ -1,6 +1,6 @@
 export default function RootLoading() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-muted">
+    <div className="min-h-dvh flex flex-col items-center justify-center gap-3 text-muted">
       <svg
         className="size-5 animate-spin"
         viewBox="0 0 24 24"

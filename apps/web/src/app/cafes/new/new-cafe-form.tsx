@@ -119,6 +119,7 @@ export function NewCafeForm() {
             <Input
               id="pincode"
               required
+              inputMode="numeric"
               pattern="\d{6}"
               maxLength={6}
               value={form.pincode}

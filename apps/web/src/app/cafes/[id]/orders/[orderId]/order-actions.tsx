@@ -4,7 +4,9 @@ import type { OrderResponse, OrderStatus } from '@mehfil/types';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { CheckCircle2, ChefHat, PackageCheck, XCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 interface Props {
@@ -81,6 +83,7 @@ export function OrderActions({ cafeId, orderId, initialStatus }: Props) {
   const [status, setStatus] = useState<OrderStatus>(initialStatus);
   const [pending, setPending] = useState<null | 'next' | 'cancel'>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function transition(next: OrderStatus, kind: 'next' | 'cancel') {
     setError(null);
@@ -88,9 +91,14 @@ export function OrderActions({ cafeId, orderId, initialStatus }: Props) {
     try {
       const data = await patchStatus(cafeId, orderId, next);
       setStatus(data.order.status);
+      toast.success(
+        next === 'cancelled' ? 'Order cancelled' : `Order marked ${next}`,
+      );
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update order');
+      const message = err instanceof Error ? err.message : 'Failed to update order';
+      setError(message);
+      toast.error(message);
     } finally {
       setPending(null);
     }
@@ -110,11 +118,6 @@ export function OrderActions({ cafeId, orderId, initialStatus }: Props) {
     transition(nextAction.status, 'next');
   }
 
-  function handleCancel() {
-    if (!confirm('Cancel this order? This cannot be undone.')) return;
-    transition('cancelled', 'cancel');
-  }
-
   return (
     <div className="space-y-3">
       <Button
@@ -131,7 +134,7 @@ export function OrderActions({ cafeId, orderId, initialStatus }: Props) {
       <Button
         type="button"
         variant="ghost"
-        onClick={handleCancel}
+        onClick={() => setConfirmOpen(true)}
         loading={pending === 'cancel'}
         disabled={pending !== null}
         className="w-full text-danger hover:bg-danger/5 hover:text-danger"
@@ -148,6 +151,17 @@ export function OrderActions({ cafeId, orderId, initialStatus }: Props) {
           {error}
         </p>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Cancel this order?"
+        description="This cannot be undone. The order will be marked cancelled."
+        confirmLabel="Cancel order"
+        cancelLabel="Keep order"
+        destructive
+        onConfirm={() => transition('cancelled', 'cancel')}
+      />
     </div>
   );
 }

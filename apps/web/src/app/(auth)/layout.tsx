@@ -3,7 +3,7 @@ import { FadeIn } from '@/components/ui/motion';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
+    <div className="min-h-dvh grid lg:grid-cols-2">
       {/* Left: form */}
       <main className="flex flex-col items-center justify-center px-6 py-12 lg:px-12">
         <div className="w-full max-w-sm">

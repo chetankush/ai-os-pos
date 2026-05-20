@@ -4,8 +4,10 @@ import type { MenuCategoryWithItems, MenuItem } from '@mehfil/types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Leaf, Plus, ScrollText, Trash2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
+import { toast } from 'sonner';
 import { Button, buttonClasses } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Field } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { FadeIn } from '@/components/ui/motion';
@@ -217,6 +219,7 @@ function ItemRow({
   onDelete: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   function toggleAvailable(next: boolean) {
     onChange({ isAvailable: next });
@@ -226,41 +229,47 @@ function ItemRow({
           method: 'PATCH',
           body: JSON.stringify({ isAvailable: next }),
         });
-      } catch {
-        // revert on error
-        onChange({ isAvailable: !next });
+        toast.success(
+          next ? `${item.name} is now available` : `${item.name} marked unavailable`,
+        );
+      } catch (err) {
+        onChange({ isAvailable: !next }); // revert
+        toast.error(err instanceof Error ? err.message : 'Failed to update item');
       }
     });
   }
 
-  function handleDelete() {
-    if (!confirm(`Delete "${item.name}"?`)) return;
+  function doDelete() {
     startTransition(async () => {
       try {
         await authedFetch(`/cafes/${cafeId}/menu/items/${item.id}`, {
           method: 'DELETE',
         });
+        toast.success(`Deleted ${item.name}`);
         onDelete();
-      } catch {
-        /* keep item; show toast in future */
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to delete item');
       }
     });
   }
 
+  const dietLabel = item.isVegetarian ? 'Vegetarian' : 'Non-vegetarian';
+
   return (
-    <div className="flex items-center gap-4 py-3">
+    <div className="flex items-center gap-3 py-3">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span
-            aria-hidden
+            role="img"
+            aria-label={dietLabel}
+            title={dietLabel}
             className={cn(
-              'size-3 rounded-sm border-2 flex items-center justify-center shrink-0',
-              item.isVegetarian
-                ? 'border-success'
-                : 'border-danger',
+              'size-3.5 rounded-sm border-2 flex items-center justify-center shrink-0',
+              item.isVegetarian ? 'border-success' : 'border-danger',
             )}
           >
             <span
+              aria-hidden
               className={cn(
                 'size-1.5 rounded-full',
                 item.isVegetarian ? 'bg-success' : 'bg-danger',
@@ -269,7 +278,10 @@ function ItemRow({
           </span>
           <p className="font-medium text-sm truncate">{item.name}</p>
           {item.isVegan && (
-            <Leaf className="size-3 text-success" aria-label="Vegan" />
+            <span className="inline-flex items-center gap-1 text-success">
+              <Leaf className="size-3" aria-hidden />
+              <span className="text-[10px] font-medium uppercase tracking-wide">Vegan</span>
+            </span>
           )}
         </div>
         {item.description && (
@@ -281,35 +293,50 @@ function ItemRow({
         ₹{(item.basePricePaise / 100).toFixed(0)}
       </div>
 
+      {/* Availability toggle — 44px tap area around a compact visual switch */}
       <button
         type="button"
         role="switch"
         aria-checked={item.isAvailable}
+        aria-label={`${item.name} availability`}
         disabled={isPending}
         onClick={() => toggleAvailable(!item.isAvailable)}
-        className={cn(
-          'relative inline-flex h-5 w-9 rounded-full transition-colors',
-          'focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2',
-          item.isAvailable ? 'bg-accent' : 'bg-border-strong',
-        )}
+        className="relative grid place-items-center size-11 shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2"
       >
         <span
           className={cn(
-            'absolute top-0.5 left-0.5 size-4 bg-bg rounded-full shadow-sm transition-transform',
-            item.isAvailable ? 'translate-x-4' : 'translate-x-0',
+            'relative block h-6 w-10 rounded-full transition-colors',
+            item.isAvailable ? 'bg-accent' : 'bg-border-strong',
           )}
-        />
+        >
+          <span
+            className={cn(
+              'absolute top-0.5 left-0.5 size-5 bg-bg rounded-full shadow-sm transition-transform',
+              item.isAvailable ? 'translate-x-4' : 'translate-x-0',
+            )}
+          />
+        </span>
       </button>
 
       <button
         type="button"
-        onClick={handleDelete}
+        onClick={() => setConfirmOpen(true)}
         disabled={isPending}
         aria-label={`Delete ${item.name}`}
-        className="text-muted hover:text-danger transition-colors p-1 rounded hover:bg-danger/5"
+        className="grid place-items-center size-11 shrink-0 -mr-2 rounded-md text-muted hover:text-danger hover:bg-danger/5 transition-colors"
       >
-        <Trash2 className="size-3.5" />
+        <Trash2 className="size-4" />
       </button>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={`Delete ${item.name}?`}
+        description="This removes the item from your menu. Past orders keep their record."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={doDelete}
+      />
     </div>
   );
 }
@@ -338,6 +365,7 @@ function AddCategoryForm({
         body: JSON.stringify({ name: name.trim() }),
       });
       onDone({ ...data.category, items: [] });
+      toast.success(`Category "${name.trim()}" added`);
       setName('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create category');
@@ -423,6 +451,7 @@ function AddItemForm({
         }),
       });
       onDone(data.item);
+      toast.success(`Added ${name.trim()}`);
       setName('');
       setPriceRupees('');
       setDescription('');

@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export function SignupForm() {
@@ -62,9 +63,8 @@ export function SignupForm() {
         htmlFor="password"
         hint="Minimum 6 characters."
       >
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="new-password"
           required
           minLength={6}

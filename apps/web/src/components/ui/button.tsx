@@ -9,7 +9,7 @@ const base =
   'transition-all duration-150 ease-out outline-none whitespace-nowrap ' +
   'focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-fg ' +
   'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none ' +
-  'active:scale-[0.98] select-none';
+  'active:scale-[0.98] select-none touch-manipulation';
 
 const variants: Record<Variant, string> = {
   primary:
@@ -22,8 +22,8 @@ const variants: Record<Variant, string> = {
 };
 
 const sizes: Record<Size, string> = {
-  sm: 'h-8 px-3 text-xs',
-  md: 'h-9 px-4 text-sm',
+  sm: 'h-9 px-3.5 text-xs',
+  md: 'h-10 px-4 text-sm',
   lg: 'h-11 px-6 text-sm',
 };
 

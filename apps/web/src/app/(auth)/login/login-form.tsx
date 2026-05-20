@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export function LoginForm() {
@@ -51,9 +52,8 @@ export function LoginForm() {
       </Field>
 
       <Field label="Password" htmlFor="password">
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="current-password"
           required
           minLength={6}

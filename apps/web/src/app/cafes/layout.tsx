@@ -17,7 +17,7 @@ export default async function CafesLayout({
   if (!user) redirect('/login');
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-dvh flex flex-col">
       <header className="sticky top-0 z-30 border-b border-border bg-bg/80 backdrop-blur supports-[backdrop-filter]:bg-bg/60">
         <div className="mx-auto max-w-6xl px-6 py-3 flex items-center justify-between">
           <Link href="/cafes" className="inline-flex items-center gap-2">

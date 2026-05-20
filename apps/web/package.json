@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@mehfil/types": "workspace:*",
+    "@radix-ui/react-alert-dialog": "^1.1.15",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.47.1",
     "clsx": "^2.1.1",
@@ -21,6 +22,7 @@
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
