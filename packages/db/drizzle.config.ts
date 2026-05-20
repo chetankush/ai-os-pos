@@ -19,6 +19,7 @@ export default defineConfig({
     './src/schema/staff.ts',
     './src/schema/audit-logs.ts',
     './src/schema/cash-drawer-sessions.ts',
+    './src/schema/ai-console.ts',
   ],
   out: './drizzle/migrations',
   dialect: 'postgresql',

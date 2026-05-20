@@ -7,16 +7,24 @@ import {
   type ToolSpec,
   runAgent,
 } from '../ai/agent.js';
+import {
+  type AiConsoleMessagesRepository,
+  createDrizzleAiConsoleMessagesRepo,
+} from '../repositories/ai-console-messages.js';
 import { createDrizzleCafesRepo, type CafesRepository } from '../repositories/cafes.js';
 import { createDrizzleMenuRepo, type MenuRepository } from '../repositories/menu.js';
 import { createDrizzleOrdersRepo, type OrdersRepository } from '../repositories/orders.js';
 
 type RunAgentFn = typeof runAgent;
 
+// How many prior turns to prime the agent with as context.
+const HISTORY_LIMIT = 10;
+
 export interface AiConsoleRoutesOptions {
   cafesRepository?: CafesRepository;
   ordersRepository?: OrdersRepository;
   menuRepository?: MenuRepository;
+  messagesRepository?: AiConsoleMessagesRepository;
   /** Injectable for tests; defaults to the real tool-calling loop. */
   runAgent?: RunAgentFn;
 }
@@ -234,14 +242,48 @@ export async function aiConsoleRoutes(
   const cafesRepo = opts.cafesRepository ?? createDrizzleCafesRepo(app.db);
   const ordersRepo = opts.ordersRepository ?? createDrizzleOrdersRepo(app.db);
   const menuRepo = opts.menuRepository ?? createDrizzleMenuRepo(app.db);
+  const messagesRepo =
+    opts.messagesRepository ?? createDrizzleAiConsoleMessagesRepo(app.db);
   const agent: RunAgentFn = opts.runAgent ?? runAgent;
+
+  async function ensureOwner(cafeId: string, ownerId: string) {
+    return cafesRepo.findByIdAndOwner(cafeId, ownerId);
+  }
+
+  // ─── GET /cafes/:cafeId/ai-console/messages — persisted transcript ──────────
+  app.get(
+    '/cafes/:cafeId/ai-console/messages',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { cafeId } = paramsSchema.parse(request.params);
+      if (!(await ensureOwner(cafeId, request.user.id))) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Cafe not found' } });
+      }
+      const messages = await messagesRepo.listRecent(cafeId, 50);
+      return { messages };
+    },
+  );
+
+  // ─── DELETE /cafes/:cafeId/ai-console/messages — clear the transcript ────────
+  app.delete(
+    '/cafes/:cafeId/ai-console/messages',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { cafeId } = paramsSchema.parse(request.params);
+      if (!(await ensureOwner(cafeId, request.user.id))) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Cafe not found' } });
+      }
+      await messagesRepo.clear(cafeId);
+      return reply.status(204).send();
+    },
+  );
 
   app.post(
     '/cafes/:cafeId/ai-console',
     { preHandler: app.authenticate },
     async (request, reply) => {
       const { cafeId } = paramsSchema.parse(request.params);
-      const cafe = await cafesRepo.findByIdAndOwner(cafeId, request.user.id);
+      const cafe = await ensureOwner(cafeId, request.user.id);
       if (!cafe) {
         return reply.status(404).send({
           error: { code: 'NOT_FOUND', message: 'Cafe not found' },
@@ -256,6 +298,11 @@ export async function aiConsoleRoutes(
       }
 
       const body = bodySchema.parse(request.body);
+
+      // Context comes from the persisted transcript (survives reloads/sessions),
+      // not the client — the client only sends the new message.
+      const recent = await messagesRepo.listRecent(cafeId, HISTORY_LIMIT);
+      const history = recent.map(({ role, content }) => ({ role, content }));
 
       const systemPrompt = [
         `You are the AI manager for "${cafe.name}". Help the owner understand and run their cafe.`,
@@ -277,8 +324,16 @@ export async function aiConsoleRoutes(
         TOOL_SPECS,
         executor,
         body.message,
-        body.history,
+        history,
       );
+
+      // Persist the turn only after a successful reply (no dangling user msg).
+      await messagesRepo.append(cafeId, { role: 'user', content: body.message });
+      await messagesRepo.append(cafeId, {
+        role: 'assistant',
+        content: result.reply,
+        toolsUsed: result.toolsUsed,
+      });
 
       return { reply: result.reply, toolsUsed: result.toolsUsed };
     },

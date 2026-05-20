@@ -11,6 +11,7 @@ import type {
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentResult } from '../ai/agent.js';
+import type { AiConsoleMessagesRepository } from '../repositories/ai-console-messages.js';
 import type { CafesRepository } from '../repositories/cafes.js';
 import type { MenuRepository } from '../repositories/menu.js';
 import type { OrdersRepository } from '../repositories/orders.js';
@@ -122,6 +123,21 @@ function createMockMenuRepo(): MenuRepository {
   } as unknown as MenuRepository;
 }
 
+function createMockMessagesRepo(): AiConsoleMessagesRepository {
+  return {
+    listRecent: vi.fn().mockResolvedValue([]),
+    append: vi.fn(async (cafeId: string, msg) => ({
+      id: 'msg-1',
+      cafeId,
+      role: msg.role,
+      content: msg.content,
+      toolsUsed: msg.toolsUsed ?? null,
+      createdAt: '2026-05-20T00:00:00.000Z',
+    })),
+    clear: vi.fn().mockResolvedValue(undefined),
+  } as unknown as AiConsoleMessagesRepository;
+}
+
 interface BuildOpts {
   cafe?: Cafe | null;
   deepseekKey?: string;
@@ -136,11 +152,13 @@ async function buildApp(opts: BuildOpts = {}) {
   const runAgentStub =
     opts.runAgent ??
     vi.fn(async () => ({ reply: 'You made ₹2500 today.', toolsUsed: ['get_today_stats'] }));
+  const messagesRepo = createMockMessagesRepo();
 
   await app.register(aiConsoleRoutes, {
     cafesRepository: createMockCafesRepo(opts.cafe === undefined ? makeCafe() : opts.cafe),
     ordersRepository: createMockOrdersRepo(),
     menuRepository: createMockMenuRepo(),
+    messagesRepository: messagesRepo,
     runAgent: runAgentStub as never,
   });
   await app.ready();
@@ -148,19 +166,21 @@ async function buildApp(opts: BuildOpts = {}) {
     { sub: OWNER_ID, email: 'owner@test.in', aud: 'authenticated' },
     { expiresIn: '1h' },
   );
-  return { app, token, runAgentStub };
+  return { app, token, runAgentStub, messagesRepo };
 }
 
 describe('POST /cafes/:cafeId/ai-console', () => {
   let app: FastifyInstance;
   let token: string;
   let runAgentStub: ReturnType<typeof vi.fn>;
+  let messagesRepo: AiConsoleMessagesRepository;
 
   beforeAll(async () => {
     const built = await buildApp({ deepseekKey: 'sk-test' });
     app = built.app;
     token = built.token;
     runAgentStub = built.runAgentStub as ReturnType<typeof vi.fn>;
+    messagesRepo = built.messagesRepo;
   });
 
   afterAll(async () => {
@@ -169,6 +189,8 @@ describe('POST /cafes/:cafeId/ai-console', () => {
 
   beforeEach(() => {
     runAgentStub.mockClear();
+    (messagesRepo.listRecent as ReturnType<typeof vi.fn>).mockClear().mockResolvedValue([]);
+    (messagesRepo.append as ReturnType<typeof vi.fn>).mockClear();
   });
 
   it('returns the agent reply + toolsUsed (200)', async () => {
@@ -185,6 +207,42 @@ describe('POST /cafes/:cafeId/ai-console', () => {
       toolsUsed: ['get_today_stats'],
     });
     expect(runAgentStub).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists the user message and the assistant reply', async () => {
+    await app.inject({
+      method: 'POST',
+      url: `/cafes/${CAFE_ID}/ai-console`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { message: 'top items?' },
+    });
+    const append = messagesRepo.append as ReturnType<typeof vi.fn>;
+    expect(append).toHaveBeenCalledTimes(2);
+    expect(append).toHaveBeenNthCalledWith(1, CAFE_ID, { role: 'user', content: 'top items?' });
+    expect(append).toHaveBeenNthCalledWith(2, CAFE_ID, {
+      role: 'assistant',
+      content: 'You made ₹2500 today.',
+      toolsUsed: ['get_today_stats'],
+    });
+  });
+
+  it('primes the agent with the persisted transcript as context', async () => {
+    (messagesRepo.listRecent as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { role: 'user', content: 'earlier question' },
+      { role: 'assistant', content: 'earlier answer' },
+    ]);
+    await app.inject({
+      method: 'POST',
+      url: `/cafes/${CAFE_ID}/ai-console`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { message: 'follow up' },
+    });
+    // 6th positional arg to runAgent is the history.
+    const history = runAgentStub.mock.calls[0]?.[5];
+    expect(history).toEqual([
+      { role: 'user', content: 'earlier question' },
+      { role: 'assistant', content: 'earlier answer' },
+    ]);
   });
 
   it('requires authentication (401)', async () => {
@@ -229,5 +287,44 @@ describe('POST /cafes/:cafeId/ai-console', () => {
     expect(res.statusCode).toBe(503);
     expect(res.json().error.code).toBe('AI_UNCONFIGURED');
     await built.app.close();
+  });
+
+  it('GET /messages returns the persisted transcript', async () => {
+    (messagesRepo.listRecent as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      {
+        id: 'm1',
+        cafeId: CAFE_ID,
+        role: 'user',
+        content: 'hi',
+        toolsUsed: null,
+        createdAt: '2026-05-20T00:00:00.000Z',
+      },
+    ]);
+    const res = await app.inject({
+      method: 'GET',
+      url: `/cafes/${CAFE_ID}/ai-console/messages`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().messages).toHaveLength(1);
+    expect(res.json().messages[0].content).toBe('hi');
+  });
+
+  it('DELETE /messages clears the transcript (204)', async () => {
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/cafes/${CAFE_ID}/ai-console/messages`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.statusCode).toBe(204);
+    expect(messagesRepo.clear).toHaveBeenCalledWith(CAFE_ID);
+  });
+
+  it('GET /messages requires authentication (401)', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/cafes/${CAFE_ID}/ai-console/messages`,
+    });
+    expect(res.statusCode).toBe(401);
   });
 });

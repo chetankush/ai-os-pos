@@ -228,6 +228,21 @@ export interface TableHistory {
   sessions: TableHistorySession[];
 }
 
+// ─── AI manager (owner console) chat ────────────────────────────────────────────
+
+export type AiConsoleRole = 'user' | 'assistant';
+
+/** A persisted turn in the owner's AI manager conversation (per cafe). */
+export interface AiConsoleMessage {
+  id: string;
+  cafeId: CafeId;
+  role: AiConsoleRole;
+  content: string;
+  /** Tools the assistant invoked for this turn (assistant rows only). */
+  toolsUsed: string[] | null;
+  createdAt: string;
+}
+
 // ─── Settle (aggregator reconciliation + dispute recovery) ──────────────────────
 
 export type SettlePlatform = 'zomato' | 'swiggy';
@@ -238,6 +253,7 @@ export type SettleCategory =
   | 'payment_gateway'
   | 'ads'
   | 'discount'
+  | 'penalty'
   | 'refund'
   | 'cancellation'
   | 'tcs'
@@ -281,6 +297,7 @@ export type SettleFindingCode =
   | 'UNAUTHORIZED_ADS'
   | 'COMMISSION_OVERCHARGE'
   | 'DISCOUNT_REVIEW'
+  | 'PENALTY_DEDUCTION'
   | 'REFUND_DEDUCTION'
   | 'HIGH_TAKE_RATE'
   | 'TCS_MISMATCH'

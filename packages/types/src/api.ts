@@ -3,6 +3,7 @@
  */
 
 import type {
+  AiConsoleMessage,
   Cafe,
   GstMode,
   MenuCategory,
@@ -301,6 +302,17 @@ export interface SettleSessionRequest {
 
 /** Settled-session history for a cafe — per-table totals + session drill-down. */
 export type TableHistoryResponse = TableHistory;
+
+// ─── AI manager console ──────────────────────────────────────────────────────
+
+export interface AiConsoleMessagesResponse {
+  messages: AiConsoleMessage[];
+}
+
+export interface AiConsoleReplyResponse {
+  reply: string;
+  toolsUsed: string[];
+}
 
 // ─── Settle ─────────────────────────────────────────────────────────────────
 

@@ -1,3 +1,4 @@
+export * from './ai-console.js';
 export * from './audit-logs.js';
 export * from './cafes.js';
 export * from './cash-drawer-sessions.js';

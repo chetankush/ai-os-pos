@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ChatMarkdown } from '@/components/ui/chat-markdown';
 import { cn } from '@/lib/cn';
+import { getDinerChat, setDinerChat } from '@/lib/diner-chat';
 import type { DinerOrderRecord } from '@/lib/diner-orders';
 import { formatRupees } from './diner-order';
 
@@ -98,6 +99,11 @@ export function AiWidget({
     };
   }, [open, view, orders, slug]);
 
+  // Restore this device's prior conversation for the cafe (localStorage).
+  useEffect(() => {
+    setMessages(getDinerChat(slug));
+  }, [slug]);
+
   useEffect(() => {
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
@@ -112,7 +118,9 @@ export function AiWidget({
     // History sent to the API: prior turns only (role + content).
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
 
-    setMessages((prev) => [...prev, { role: 'user', content: message }]);
+    const withUser: ChatMessage[] = [...messages, { role: 'user', content: message }];
+    setMessages(withUser);
+    setDinerChat(slug, withUser);
     setInput('');
     setError(null);
     setLoading(true);
@@ -131,14 +139,16 @@ export function AiWidget({
         throw new Error(err?.error?.message ?? `The waiter is unavailable (${res.status})`);
       }
       const data = (await res.json()) as AiReply;
-      setMessages((prev) => [
-        ...prev,
+      const final: ChatMessage[] = [
+        ...withUser,
         {
           role: 'assistant',
           content: data.reply,
           suggestedItemIds: data.suggestedItemIds,
         },
-      ]);
+      ];
+      setMessages(final);
+      setDinerChat(slug, final);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'The waiter is unavailable right now.',

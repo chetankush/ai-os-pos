@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { BarChart3, Send } from 'lucide-react';
+import { BarChart3, Send, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -30,8 +30,13 @@ interface AiConsoleResponse {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-// How many prior turns to send back to the model with each request.
-const HISTORY_LIMIT = 10;
+async function authHeaders(): Promise<Record<string, string>> {
+  const supabase = createSupabaseBrowserClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session ? { authorization: `Bearer ${session.access_token}` } : {};
+}
 
 // Showcase both Q&A (read) and actions (write) the manager can perform.
 const EXAMPLE_PROMPTS = [
@@ -51,6 +56,36 @@ export function ManagerChat({ cafeId }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Load the persisted transcript on mount so context survives reloads/sessions.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`${API_URL}/cafes/${cafeId}/ai-console/messages`, {
+          headers: await authHeaders(),
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          messages: { role: Role; content: string; toolsUsed: string[] | null }[];
+        };
+        if (!cancelled) {
+          setMessages(
+            data.messages.map((m) => ({
+              role: m.role,
+              content: m.content,
+              toolsUsed: m.toolsUsed ?? undefined,
+            })),
+          );
+        }
+      } catch {
+        // non-fatal — start with an empty chat
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cafeId]);
+
   // Keep the latest message in view as the conversation grows / typing shows.
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -59,6 +94,19 @@ export function ManagerChat({ cafeId }: Props) {
     });
   }, [messages, sending]);
 
+  async function clearChat() {
+    if (sending || messages.length === 0) return;
+    setMessages([]);
+    try {
+      await fetch(`${API_URL}/cafes/${cafeId}/ai-console/messages`, {
+        method: 'DELETE',
+        headers: await authHeaders(),
+      });
+    } catch {
+      // ignore — UI already cleared
+    }
+  }
+
   async function send(raw: string) {
     const message = raw.trim();
     if (!message || sending) return;
@@ -66,29 +114,19 @@ export function ManagerChat({ cafeId }: Props) {
     setError(null);
     setInput('');
 
-    // Snapshot the running history (capped) BEFORE appending the new turn.
-    const history = messages
-      .slice(-HISTORY_LIMIT)
-      .map(({ role, content }) => ({ role, content }));
-
     setMessages((prev) => [...prev, { role: 'user', content: message }]);
     setSending(true);
 
     try {
-      const supabase = createSupabaseBrowserClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
+      // The server primes the model from the persisted transcript, so the
+      // client only sends the new message.
       const res = await fetch(`${API_URL}/cafes/${cafeId}/ai-console`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          ...(session
-            ? { authorization: `Bearer ${session.access_token}` }
-            : {}),
+          ...(await authHeaders()),
         },
-        body: JSON.stringify({ message, history }),
+        body: JSON.stringify({ message }),
       });
 
       if (!res.ok) {
@@ -127,6 +165,22 @@ export function ManagerChat({ cafeId }: Props) {
 
   return (
     <Card className="flex h-[70vh] max-h-[640px] flex-col overflow-hidden">
+      {/* Header — title + clear */}
+      <div className="flex items-center justify-between border-b border-border px-4 py-2.5 sm:px-6">
+        <span className="text-sm font-medium">AI manager</span>
+        {!isEmpty && (
+          <button
+            type="button"
+            onClick={() => void clearChat()}
+            disabled={sending}
+            className="inline-flex items-center gap-1 text-xs text-muted transition-colors hover:text-danger disabled:opacity-50"
+          >
+            <Trash2 className="size-3.5" />
+            Clear
+          </button>
+        )}
+      </div>
+
       {/* Message list */}
       <div
         ref={scrollRef}
