@@ -50,6 +50,13 @@
       "when": 1779273121767,
       "tag": "0006_harsh_shape",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779284432958,
+      "tag": "0007_cultured_silhouette",
+      "breakpoints": true
     }
   ]
 }

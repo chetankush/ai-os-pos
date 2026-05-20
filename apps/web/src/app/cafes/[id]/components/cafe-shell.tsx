@@ -3,13 +3,17 @@
 import {
   BarChart3,
   LayoutDashboard,
+  LineChart,
   Menu as MenuIcon,
   MessageSquareText,
   Pencil,
   QrCode,
   ReceiptText,
+  ScrollText,
   ShoppingBag,
+  Users,
   UtensilsCrossed,
+  Wallet,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -48,6 +52,10 @@ export function CafeShell({
     { label: 'Orders', href: `${base}/orders`, icon: <ReceiptText className="size-4" /> },
     { label: 'Menu', href: `${base}/menu`, icon: <UtensilsCrossed className="size-4" /> },
     { label: 'Tables & QR', href: `${base}/tables`, icon: <QrCode className="size-4" /> },
+    { label: 'Reports', href: `${base}/reports`, icon: <LineChart className="size-4" /> },
+    { label: 'Cash drawer', href: `${base}/cash-drawer`, icon: <Wallet className="size-4" /> },
+    { label: 'Staff', href: `${base}/staff`, icon: <Users className="size-4" /> },
+    { label: 'Audit log', href: `${base}/audit`, icon: <ScrollText className="size-4" /> },
     { label: 'AI Manager', href: `${base}/manager`, icon: <BarChart3 className="size-4" /> },
     { label: 'AI Waiter', href: `${base}/ai-waiter`, icon: <MessageSquareText className="size-4" /> },
   ];
