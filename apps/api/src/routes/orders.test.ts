@@ -76,6 +76,7 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
     status: 'pending',
     source: 'counter',
     tableLabel: null,
+    tableSessionId: null,
     customerName: null,
     customerPhone: null,
     notes: null,
@@ -116,6 +117,8 @@ function createMockOrdersRepo() {
   return {
     create: vi.fn<(d: NewOrder) => Promise<OrderWithItems>>(),
     listByCafe: vi.fn<(cafeId: string, limit?: number) => Promise<Order[]>>(),
+    listBySession:
+      vi.fn<(sessionId: string, cafeId: string) => Promise<OrderWithItems[]>>(),
     findByIdAndCafe: vi.fn<(id: string, cafeId: string) => Promise<OrderWithItems | null>>(),
     updateStatus: vi.fn<(id: string, cafeId: string, status: OrderStatus) => Promise<Order | null>>(),
     todayStats: vi.fn<(cafeId: string) => Promise<OrderStatsResponse>>(),

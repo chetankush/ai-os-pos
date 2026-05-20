@@ -96,6 +96,7 @@ export interface Order {
   status: OrderStatus;
   source: OrderSource;
   tableLabel: string | null;
+  tableSessionId: string | null;
   customerName: string | null;
   customerPhone: string | null;
   notes: string | null;
@@ -114,6 +115,59 @@ export interface Order {
 
 export interface OrderWithItems extends Order {
   items: OrderItem[];
+}
+
+// ─── Tables & floor plan ────────────────────────────────────────────────────────
+
+export type TableId = string;
+export type TableShape = 'round' | 'square';
+export type TableSessionStatus = 'open' | 'billed' | 'closed';
+
+export interface RestaurantTable {
+  id: TableId;
+  cafeId: CafeId;
+  label: string;
+  area: string | null;
+  shape: TableShape;
+  seats: number;
+  x: number;
+  y: number;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TableSession {
+  id: string;
+  cafeId: CafeId;
+  tableId: TableId;
+  status: TableSessionStatus;
+  guestName: string | null;
+  guestPhone: string | null;
+  partySize: number | null;
+  openedAt: string;
+  closedAt: string | null;
+}
+
+/** Derived display status for the live floor view. */
+export type TableLiveStatus = 'free' | 'occupied' | 'ready' | 'billed';
+
+/** A table plus its current session summary — powers the live floor view. */
+export interface TableWithStatus extends RestaurantTable {
+  liveStatus: TableLiveStatus;
+  session: TableSession | null;
+  orderCount: number;
+  runningTotalPaise: number;
+}
+
+/** A session with its orders + combined totals — the running tab / settle view. */
+export interface TableSessionDetail {
+  session: TableSession;
+  table: RestaurantTable;
+  orders: OrderWithItems[];
+  subtotalPaise: number;
+  taxPaise: number;
+  totalPaise: number;
 }
 
 // ─── Settle (aggregator reconciliation + dispute recovery) ──────────────────────

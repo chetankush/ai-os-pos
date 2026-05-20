@@ -25,6 +25,7 @@ const orderParamsSchema = z.object({
 const createOrderBodySchema = z.object({
   source: z.enum(['counter', 'qr', 'phone']).optional(),
   tableLabel: z.string().trim().max(40).optional(),
+  tableSessionId: z.string().uuid().optional(),
   customerName: z.string().trim().max(80).optional(),
   customerPhone: z
     .string()
@@ -108,6 +109,7 @@ export async function ordersRoutes(
         orderNumber: generateOrderNumber(),
         source: body.source ?? 'counter',
         tableLabel: body.tableLabel ?? null,
+        tableSessionId: body.tableSessionId ?? null,
         customerName: body.customerName ?? null,
         customerPhone: body.customerPhone ?? null,
         notes: body.notes ?? null,

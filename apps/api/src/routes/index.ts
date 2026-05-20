@@ -8,6 +8,8 @@ import { ordersRoutes } from './orders.js';
 import { paymentsRoutes } from './payments.js';
 import { publicRoutes } from './public.js';
 import { settleRoutes } from './settle.js';
+import { tableSessionsRoutes } from './table-sessions.js';
+import { tablesRoutes } from './tables.js';
 import { uploadsRoutes } from './uploads.js';
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
@@ -21,6 +23,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     await app.register(cafesRoutes);
     await app.register(menuRoutes);
     await app.register(ordersRoutes);
+    await app.register(tablesRoutes);
+    await app.register(tableSessionsRoutes);
     await app.register(aiRoutes);
     await app.register(aiConsoleRoutes);
   } else {

@@ -47,6 +47,8 @@ export const orders = pgTable(
     source: text({ enum: orderSourceValues }).notNull().default('counter'),
 
     tableLabel: text(),
+    // Links the order to a table session (running tab) when ordered at a table.
+    tableSessionId: uuid(),
     customerName: text(),
     customerPhone: text(),
     notes: text(),

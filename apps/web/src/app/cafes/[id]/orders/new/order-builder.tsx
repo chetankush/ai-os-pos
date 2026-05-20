@@ -8,7 +8,7 @@ import type {
   OrderResponse,
 } from '@sangam/types';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Minus, Plus, Search, ShoppingBag, Trash2, X } from 'lucide-react';
+import { Armchair, Minus, Plus, Search, ShoppingBag, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -23,6 +23,10 @@ interface Props {
   cafeId: string;
   cafe: Cafe;
   categories: MenuCategoryWithItems[];
+  /** When set, the order is attached to this open table session. */
+  sessionId?: string | null;
+  /** Table label for the "Adding to Table {label}" banner. */
+  sessionTableLabel?: string | null;
 }
 
 interface CartLine {
@@ -59,8 +63,15 @@ function formatRupees(paise: number): string {
   )}`;
 }
 
-export function OrderBuilder({ cafeId, cafe, categories }: Props) {
+export function OrderBuilder({
+  cafeId,
+  cafe,
+  categories,
+  sessionId,
+  sessionTableLabel,
+}: Props) {
   const router = useRouter();
+  const inSession = Boolean(sessionId);
   const [cart, setCart] = useState<Map<string, CartLine>>(new Map());
   const [tableLabel, setTableLabel] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -167,6 +178,7 @@ export function OrderBuilder({ cafeId, cafe, categories }: Props) {
       ...(trimmedPhone ? { customerPhone: trimmedPhone } : {}),
       ...(tableLabel.trim() ? { tableLabel: tableLabel.trim() } : {}),
       ...(notes.trim() ? { notes: notes.trim() } : {}),
+      ...(sessionId ? { tableSessionId: sessionId } : {}),
     };
 
     setSubmitting(true);
@@ -176,7 +188,12 @@ export function OrderBuilder({ cafeId, cafe, categories }: Props) {
         body: JSON.stringify(body),
       })) as OrderResponse;
       toast.success(`Order ${data.order.orderNumber} placed`);
-      router.push(`/cafes/${cafeId}/orders/${data.order.id}`);
+      // Adding to a table tab → return to the live floor; otherwise show the order.
+      if (inSession) {
+        router.push(`/cafes/${cafeId}/tables`);
+      } else {
+        router.push(`/cafes/${cafeId}/orders/${data.order.id}`);
+      }
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create order');
@@ -217,6 +234,19 @@ export function OrderBuilder({ cafeId, cafe, categories }: Props) {
 
   return (
     <>
+      {inSession && (
+        <div className="mb-4 flex items-center gap-2.5 rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 text-sm">
+          <Armchair className="size-4 shrink-0 text-accent" aria-hidden="true" />
+          <span className="text-fg">
+            Adding to{' '}
+            <span className="font-semibold">
+              Table {sessionTableLabel ?? '—'}
+            </span>{' '}
+            tab
+          </span>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-5">
         {/* ─── Fast item pad ─────────────────────────────────────────────── */}
         <div className="lg:col-span-3 space-y-3">
@@ -414,12 +444,13 @@ function ItemTile({
       <button
         type="button"
         onClick={onAdd}
+        aria-label={`Add ${item.name}`}
         className={cn(
           'flex h-24 w-full flex-col justify-between rounded-xl border bg-bg p-3 text-left',
           'transition-all duration-100 touch-manipulation active:scale-[0.98]',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
           qty > 0
-            ? 'border-fg ring-1 ring-fg'
+            ? 'border-accent ring-1 ring-accent'
             : 'border-border hover:border-border-strong hover:bg-subtle/50',
         )}
       >
@@ -449,24 +480,36 @@ function ItemTile({
         </span>
       </button>
 
-      {/* In-tile quantity controls — adjust without opening the cart */}
-      {qty > 0 && (
-        <button
-          type="button"
-          onClick={onDec}
-          aria-label={`Remove one ${item.name}`}
-          className="absolute bottom-2 right-2 grid size-8 place-items-center rounded-lg border border-border bg-bg text-fg shadow-sm hover:bg-subtle"
-        >
-          <Minus className="size-3.5" />
-        </button>
-      )}
-      {qty > 0 && (
+      {/* Explicit add / quantity control so it's obvious how to add an item */}
+      {qty === 0 ? (
         <span
-          aria-label={`${qty} in cart`}
-          className="absolute -right-1.5 -top-1.5 grid min-w-6 place-items-center rounded-full bg-accent px-1.5 py-0.5 text-xs font-semibold tabular-nums text-accent-fg shadow"
+          aria-hidden
+          className="pointer-events-none absolute bottom-2 right-2 grid size-8 place-items-center rounded-lg border border-border bg-bg text-accent shadow-sm"
         >
-          {qty}
+          <Plus className="size-4" />
         </span>
+      ) : (
+        <div className="absolute bottom-2 right-2 flex items-center rounded-lg border border-accent bg-bg shadow-sm">
+          <button
+            type="button"
+            onClick={onDec}
+            aria-label={`Remove one ${item.name}`}
+            className="grid size-8 place-items-center rounded-l-lg text-accent hover:bg-subtle"
+          >
+            <Minus className="size-3.5" />
+          </button>
+          <span className="min-w-5 text-center text-sm font-semibold tabular-nums text-accent">
+            {qty}
+          </span>
+          <button
+            type="button"
+            onClick={onAdd}
+            aria-label={`Add one ${item.name}`}
+            className="grid size-8 place-items-center rounded-r-lg text-accent hover:bg-subtle"
+          >
+            <Plus className="size-3.5" />
+          </button>
+        </div>
       )}
     </div>
   );

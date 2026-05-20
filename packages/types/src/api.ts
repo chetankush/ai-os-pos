@@ -12,6 +12,11 @@ import type {
   OrderWithItems,
   PaymentMethod,
   PaymentStatus,
+  RestaurantTable,
+  TableSession,
+  TableSessionDetail,
+  TableShape,
+  TableWithStatus,
   SettleConfig,
   SettleReport,
   SettleStatement,
@@ -126,6 +131,7 @@ export interface MenuItemResponse {
 export interface CreateOrderRequest {
   source?: 'counter' | 'qr' | 'phone';
   tableLabel?: string;
+  tableSessionId?: string;
   customerName?: string;
   customerPhone?: string;
   notes?: string;
@@ -227,6 +233,61 @@ export interface VerifyPaymentRequest {
 
 export interface VerifyPaymentResponse {
   order: PublicOrder;
+}
+
+// ─── Tables & floor plan ────────────────────────────────────────────────────
+
+export interface CreateTableRequest {
+  label: string;
+  area?: string | null;
+  shape?: TableShape;
+  seats?: number;
+  x?: number;
+  y?: number;
+  sortOrder?: number;
+}
+
+export interface UpdateTableRequest {
+  label?: string;
+  area?: string | null;
+  shape?: TableShape;
+  seats?: number;
+  x?: number;
+  y?: number;
+  sortOrder?: number;
+}
+
+export interface TablesListResponse {
+  tables: RestaurantTable[];
+}
+
+export interface TableResponse {
+  table: RestaurantTable;
+}
+
+/** Live floor view — every table with its current session summary. */
+export interface FloorResponse {
+  tables: TableWithStatus[];
+}
+
+export interface OpenSessionRequest {
+  tableId: string;
+  guestName?: string;
+  guestPhone?: string;
+  partySize?: number;
+}
+
+export interface TableSessionResponse {
+  session: TableSession;
+}
+
+export interface TableSessionDetailResponse {
+  session: TableSessionDetail;
+}
+
+/** Settle the whole table session (all its orders) as one bill. */
+export interface SettleSessionRequest {
+  paymentMethod: PaymentMethod;
 }
 
 // ─── Settle ─────────────────────────────────────────────────────────────────

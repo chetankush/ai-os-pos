@@ -8,7 +8,7 @@ import type {
   PaymentMethod,
   PaymentStatus,
 } from '@sangam/types';
-import { and, count, desc, eq, gte, ilike, sql, sum } from 'drizzle-orm';
+import { and, count, desc, eq, gte, ilike, inArray, sql, sum } from 'drizzle-orm';
 
 export interface NewOrderItem {
   menuItemId: string | null;
@@ -23,6 +23,7 @@ export interface NewOrder {
   orderNumber: string;
   source: 'counter' | 'qr' | 'phone';
   tableLabel: string | null;
+  tableSessionId: string | null;
   customerName: string | null;
   customerPhone: string | null;
   notes: string | null;
@@ -36,6 +37,8 @@ export interface NewOrder {
 export interface OrdersRepository {
   create(data: NewOrder): Promise<OrderWithItems>;
   listByCafe(cafeId: string, limit?: number): Promise<Order[]>;
+  /** All orders (with items) attached to a table session, oldest first. */
+  listBySession(sessionId: string, cafeId: string): Promise<OrderWithItems[]>;
   findByIdAndCafe(id: string, cafeId: string): Promise<OrderWithItems | null>;
   updateStatus(
     id: string,
@@ -81,6 +84,7 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
             orderNumber: data.orderNumber,
             source: data.source,
             tableLabel: data.tableLabel,
+            tableSessionId: data.tableSessionId,
             customerName: data.customerName,
             customerPhone: data.customerPhone,
             notes: data.notes,
@@ -123,6 +127,35 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
         .where(eq(schema.orders.cafeId, cafeId))
         .orderBy(desc(schema.orders.createdAt))
         .limit(limit);
+    },
+
+    async listBySession(sessionId, cafeId) {
+      const orderRows = await db
+        .select()
+        .from(schema.orders)
+        .where(
+          and(
+            eq(schema.orders.tableSessionId, sessionId),
+            eq(schema.orders.cafeId, cafeId),
+          ),
+        )
+        .orderBy(schema.orders.createdAt);
+
+      if (orderRows.length === 0) return [];
+
+      const ids = orderRows.map((o) => o.id);
+      const itemRows = await db
+        .select()
+        .from(schema.orderItems)
+        .where(inArray(schema.orderItems.orderId, ids));
+
+      const byOrder = new Map<string, OrderItem[]>();
+      for (const item of itemRows) {
+        const list = byOrder.get(item.orderId) ?? [];
+        list.push(item);
+        byOrder.set(item.orderId, list);
+      }
+      return orderRows.map((o) => ({ ...o, items: byOrder.get(o.id) ?? [] }));
     },
 
     async findByIdAndCafe(id, cafeId) {

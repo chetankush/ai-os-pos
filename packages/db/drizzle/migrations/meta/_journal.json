@@ -36,6 +36,20 @@
       "when": 1779247287652,
       "tag": "0004_long_lyja",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779273073579,
+      "tag": "0005_robust_sinister_six",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779273121767,
+      "tag": "0006_harsh_shape",
+      "breakpoints": true
     }
   ]
 }
