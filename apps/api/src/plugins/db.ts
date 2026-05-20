@@ -1,4 +1,4 @@
-import { createDb, type Database } from '@cafespace/db';
+import { createDb, type Database } from '@mehfil/db';
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
 

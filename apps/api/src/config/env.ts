@@ -20,6 +20,7 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().optional(),
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
+  REDIS_URL: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

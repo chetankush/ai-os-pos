@@ -1,8 +1,8 @@
 {
-  "name": "cafespace",
+  "name": "mehfil",
   "version": "0.0.1",
   "private": true,
-  "description": "Cafespace — AI-native restaurant operating system",
+  "description": "Mehfil — AI-native restaurant operating system",
   "packageManager": "pnpm@11.0.8",
   "engines": {
     "node": ">=22.0.0",

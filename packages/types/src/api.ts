@@ -1,7 +1,13 @@
 /**
  * API request/response envelopes shared between frontend and backend.
- * Concrete endpoint payloads live alongside their domain types.
  */
+
+import type {
+  Cafe,
+  MenuCategory,
+  MenuCategoryWithItems,
+  MenuItem,
+} from './domain.js';
 
 export interface ApiError {
   code: string;
@@ -38,9 +44,55 @@ export interface CreateCafeRequest {
 }
 
 export interface CafesListResponse {
-  cafes: import('./domain.js').Cafe[];
+  cafes: Cafe[];
 }
 
 export interface CafeResponse {
-  cafe: import('./domain.js').Cafe;
+  cafe: Cafe;
+}
+
+// ─── Menu ─────────────────────────────────────────────────────────────────────
+
+export interface MenuResponse {
+  categories: MenuCategoryWithItems[];
+}
+
+export interface CreateMenuCategoryRequest {
+  name: string;
+  sortOrder?: number;
+}
+
+export interface CreateMenuItemRequest {
+  categoryId: string;
+  name: string;
+  description?: string;
+  basePricePaise: number;
+  imageUrl?: string;
+  isVegetarian?: boolean;
+  isVegan?: boolean;
+  containsEgg?: boolean;
+  spiceLevel?: number;
+  sortOrder?: number;
+}
+
+export interface UpdateMenuItemRequest {
+  name?: string;
+  description?: string | null;
+  basePricePaise?: number;
+  imageUrl?: string | null;
+  isVegetarian?: boolean;
+  isVegan?: boolean;
+  containsEgg?: boolean;
+  spiceLevel?: number;
+  isAvailable?: boolean;
+  sortOrder?: number;
+  categoryId?: string;
+}
+
+export interface MenuCategoryResponse {
+  category: MenuCategory;
+}
+
+export interface MenuItemResponse {
+  item: MenuItem;
 }

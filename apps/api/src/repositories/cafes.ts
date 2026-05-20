@@ -1,5 +1,5 @@
-import { schema, type Database } from '@cafespace/db';
-import type { Cafe } from '@cafespace/types';
+import { schema, type Database } from '@mehfil/db';
+import type { Cafe } from '@mehfil/types';
 import { and, desc, eq } from 'drizzle-orm';
 
 export interface NewCafe {

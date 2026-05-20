@@ -4,7 +4,7 @@ import type {
   CafesListResponse,
   CreateCafeRequest,
   HealthResponse,
-} from '@cafespace/types';
+} from '@mehfil/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
