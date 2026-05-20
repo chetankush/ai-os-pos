@@ -1,0 +1,33 @@
+# Local dev Postgres for cafespace — fully isolated from any other Postgres
+# instance on this machine. Listens on port 5434 (NOT the default 5432, and
+# not 5433 which is commonly taken by other dev projects) and uses a named
+# volume `cafespace_pg_data` that won't collide with other projects.
+#
+# Start:   docker compose up -d
+# Stop:    docker compose down
+# Destroy: docker compose down -v   (wipes all data)
+# Logs:    docker compose logs -f postgres
+# Shell:   docker compose exec postgres psql -U cafespace cafespace
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cafespace_postgres
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: cafespace
+      POSTGRES_PASSWORD: cafespace
+      POSTGRES_DB: cafespace
+    volumes:
+      - cafespace_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cafespace -d cafespace"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  cafespace_pg_data:
+    name: cafespace_pg_data
