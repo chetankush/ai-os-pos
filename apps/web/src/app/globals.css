@@ -7,16 +7,20 @@
 @theme {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  /* Brand/marketing display font — Outfit (a free Gilroy-style geometric sans). */
+  --font-display: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
 
   /* Light (white) mode — the default. */
   --color-bg: #ffffff;
   --color-fg: #1c1917;
-  --color-muted: #78716c;
-  --color-subtle: #fafaf9;
-  --color-border: #e7e5e4;
-  --color-border-strong: #d6d3d1;
-  --color-accent: #1c1917;
-  --color-accent-fg: #fafaf9;
+  --color-muted: #6b6560;
+  --color-subtle: #f4f4f2;
+  --color-border: #d2cfca;
+  --color-border-strong: #a8a29e;
+  /* Brand: spiced terracotta-coral — warm, appetizing, distinctly Indian-cafe
+     (leans orange, not Airbnb's pink-coral). */
+  --color-accent: #db5437;
+  --color-accent-fg: #ffffff;
   --color-danger: #dc2626;
   --color-success: #16a34a;
 }
@@ -27,10 +31,11 @@
   --color-fg: #fafaf9;
   --color-muted: #a8a29e;
   --color-subtle: #1c1917;
-  --color-border: #292524;
-  --color-border-strong: #44403c;
-  --color-accent: #fafaf9;
-  --color-accent-fg: #1c1917;
+  --color-border: #3a3531;
+  --color-border-strong: #57514b;
+  /* Slightly brighter terracotta-coral so it pops on the near-black surface. */
+  --color-accent: #ee6a48;
+  --color-accent-fg: #ffffff;
 }
 
 html,

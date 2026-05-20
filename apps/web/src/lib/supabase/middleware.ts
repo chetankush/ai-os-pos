@@ -31,9 +31,13 @@ export async function updateSupabaseSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isAuthRoute = path === '/login' || path === '/signup';
+  // Public marketing pages — reachable without an account.
+  const isMarketing =
+    path === '/about' || path === '/partners' || path === '/pricing';
   const isPublic =
     path === '/' ||
     isAuthRoute ||
+    isMarketing ||
     path.startsWith('/m/') ||
     path.startsWith('/_next') ||
     path.startsWith('/api/');

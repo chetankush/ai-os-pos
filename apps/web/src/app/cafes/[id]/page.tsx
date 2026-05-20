@@ -4,7 +4,6 @@ import type {
   OrderStatsResponse,
   OrdersListResponse,
 } from '@sangam/types';
-import type { OrderStatus } from '@sangam/types';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, ArrowRight, ChevronRight } from 'lucide-react';
@@ -20,30 +19,13 @@ import { FadeIn, Stagger, StaggerItem } from '@/components/ui/motion';
 import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/api-server';
 import { cn } from '@/lib/cn';
+import { StatusPill } from './orders/_components/status-pill';
 
 export const metadata = { title: 'Dashboard · Sangam' };
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
-
-// ─── Shared status styles (must match orders pages) ─────────────────────────
-
-const STATUS_STYLES: Record<OrderStatus, string> = {
-  pending: 'bg-amber-100 text-amber-900 border-amber-200',
-  preparing: 'bg-blue-100 text-blue-900 border-blue-200',
-  ready: 'bg-emerald-100 text-emerald-900 border-emerald-200',
-  completed: 'bg-zinc-100 text-zinc-700 border-zinc-200',
-  cancelled: 'bg-red-100 text-red-900 border-red-200',
-};
-
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  pending: 'Pending',
-  preparing: 'Preparing',
-  ready: 'Ready',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-};
 
 export default async function CafeDashboardPage({ params }: PageProps) {
   const { id } = await params;
@@ -173,48 +155,6 @@ export default async function CafeDashboardPage({ params }: PageProps) {
         </Card>
       </FadeIn>
 
-      {/* Action shortcuts */}
-      <FadeIn delay={0.1}>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={`/cafes/${cafe.id}/orders/new`}
-            className={buttonClasses({ variant: 'primary' })}
-          >
-            New order
-          </Link>
-          <Link
-            href={`/cafes/${cafe.id}/menu`}
-            className={buttonClasses({ variant: 'secondary' })}
-          >
-            Manage menu
-          </Link>
-          <Link
-            href={`/cafes/${cafe.id}/orders`}
-            className={buttonClasses({ variant: 'secondary' })}
-          >
-            View all orders
-          </Link>
-          <Link
-            href={`/cafes/${cafe.id}/tables`}
-            className={buttonClasses({ variant: 'secondary' })}
-          >
-            Tables &amp; QR
-          </Link>
-          <Link
-            href={`/cafes/${cafe.id}/ai-waiter`}
-            className={buttonClasses({ variant: 'secondary' })}
-          >
-            AI Waiter
-          </Link>
-          <Link
-            href={`/cafes/${cafe.id}/manager`}
-            className={buttonClasses({ variant: 'secondary' })}
-          >
-            AI Manager
-          </Link>
-        </div>
-      </FadeIn>
-
       {/* Recent orders */}
       <FadeIn delay={0.15}>
         <Card>
@@ -328,7 +268,7 @@ function OrderRow({ cafeId, order }: { cafeId: string; order: Order }) {
           {formatTime(order.createdAt)}
         </span>
         <span className="text-xs text-muted">·</span>
-        <StatusBadge status={order.status} />
+        <StatusPill status={order.status} />
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <span className="text-sm font-semibold tabular-nums">
@@ -377,19 +317,6 @@ function ReconRow({
   );
 }
 
-function StatusBadge({ status }: { status: OrderStatus }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border',
-        STATUS_STYLES[status],
-      )}
-    >
-      <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
-      {STATUS_LABELS[status]}
-    </span>
-  );
-}
 
 function Row({
   label,

@@ -121,6 +121,7 @@ export async function publicRoutes(
       orderNumber: generateOrderNumber(),
       source: 'qr',
       tableLabel: body.tableLabel ?? null,
+      tableSessionId: null,
       customerName: body.customerName ?? null,
       customerPhone: body.customerPhone ?? null,
       notes: body.notes ?? null,

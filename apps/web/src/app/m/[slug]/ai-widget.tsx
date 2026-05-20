@@ -1,11 +1,17 @@
 'use client';
 
-import type { MenuItem } from '@sangam/types';
-import { Plus, Send, ShoppingBag, Sparkles, X } from 'lucide-react';
+import type {
+  MenuItem,
+  OrderStatus,
+  PaymentStatus,
+  PublicOrderDetailResponse,
+} from '@sangam/types';
+import { ArrowLeft, Plus, ReceiptText, Send, ShoppingBag, Sparkles, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ChatMarkdown } from '@/components/ui/chat-markdown';
 import { cn } from '@/lib/cn';
+import type { DinerOrderRecord } from '@/lib/diner-orders';
 import { formatRupees } from './diner-order';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -33,7 +39,11 @@ interface Props {
   subtotalPaise: number;
   /** Open the full cart/order sheet (closes this chat first). */
   onViewCart: () => void;
+  /** This device's past orders at this cafe (localStorage). */
+  orders: DinerOrderRecord[];
 }
+
+type LiveStatus = { status: OrderStatus; paymentStatus: PaymentStatus };
 
 export function AiWidget({
   slug,
@@ -44,13 +54,49 @@ export function AiWidget({
   itemCount,
   subtotalPaise,
   onViewCart,
+  orders,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState<'chat' | 'orders'>('chat');
+  const [liveById, setLiveById] = useState<Record<string, LiveStatus>>({});
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Refresh live order status from the server when "Your orders" is opened —
+  // localStorage holds the snapshot; the server is the source of truth.
+  useEffect(() => {
+    if (!open || view !== 'orders' || orders.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const entries = await Promise.all(
+        orders.map(async (o) => {
+          try {
+            const res = await fetch(
+              `${API_URL}/public/cafes/${encodeURIComponent(slug)}/orders/${o.id}`,
+            );
+            if (!res.ok) return null;
+            const data = (await res.json()) as PublicOrderDetailResponse;
+            return [
+              o.id,
+              { status: data.order.status, paymentStatus: data.order.paymentStatus },
+            ] as const;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      if (cancelled) return;
+      const map: Record<string, LiveStatus> = {};
+      for (const e of entries) if (e) map[e[0]] = e[1];
+      setLiveById(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, view, orders, slug]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -130,21 +176,51 @@ export function AiWidget({
             className="absolute inset-0 bg-black/40"
           />
           <div className="relative mx-auto flex h-[80dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border-t border-border bg-bg">
-            <div className="flex items-center justify-between border-b border-border p-4">
-              <h2 className="inline-flex items-center gap-2 text-base font-semibold tracking-tight">
-                <Sparkles className="size-4 text-accent" />
-                Ask the waiter
-              </h2>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-                className="grid size-11 place-items-center rounded-lg text-muted hover:bg-subtle hover:text-fg"
-              >
-                <X className="size-5" />
-              </button>
+            <div className="flex items-center justify-between gap-2 border-b border-border p-4">
+              {view === 'orders' ? (
+                <button
+                  type="button"
+                  onClick={() => setView('chat')}
+                  className="inline-flex items-center gap-1.5 text-base font-semibold tracking-tight"
+                >
+                  <ArrowLeft className="size-4" />
+                  Your orders
+                </button>
+              ) : (
+                <h2 className="inline-flex items-center gap-2 text-base font-semibold tracking-tight">
+                  <Sparkles className="size-4 text-accent" />
+                  Ask the waiter
+                </h2>
+              )}
+              <div className="flex items-center gap-1">
+                {view === 'chat' && orders.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setView('orders')}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3 text-xs font-medium hover:bg-subtle hover:border-border-strong touch-manipulation"
+                  >
+                    <ReceiptText className="size-3.5" />
+                    Your orders
+                    <span className="grid min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-fg">
+                      {orders.length}
+                    </span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close"
+                  className="grid size-11 place-items-center rounded-lg text-muted hover:bg-subtle hover:text-fg"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
             </div>
 
+            {view === 'orders' ? (
+              <OrdersView orders={orders} liveById={liveById} />
+            ) : (
+              <>
             <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
               {messages.length === 0 && (
                 <div className="py-8 text-center">
@@ -282,6 +358,8 @@ export function AiWidget({
                 <Send className="size-4" />
               </button>
             </form>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -292,5 +370,112 @@ export function AiWidget({
 function Dot() {
   return (
     <span className="size-1.5 animate-bounce rounded-full bg-muted [animation-duration:0.8s]" />
+  );
+}
+
+// ─── Your orders (this device, live status) ────────────────────────────────────
+
+const STATUS_VIEW: Record<OrderStatus, { label: string; cls: string }> = {
+  pending: {
+    label: 'Order placed',
+    cls: 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100',
+  },
+  preparing: {
+    label: 'Being prepared',
+    cls: 'bg-blue-100 text-blue-900 dark:bg-blue-900/30 dark:text-blue-100',
+  },
+  ready: {
+    label: 'Ready!',
+    cls: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100',
+  },
+  completed: {
+    label: 'Completed',
+    cls: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    cls: 'bg-red-100 text-red-900 dark:bg-red-900/30 dark:text-red-100',
+  },
+};
+
+function formatTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
+
+function OrdersView({
+  orders,
+  liveById,
+}: {
+  orders: DinerOrderRecord[];
+  liveById: Record<string, LiveStatus>;
+}) {
+  return (
+    <div className="flex-1 space-y-3 overflow-y-auto p-4">
+      {orders.length === 0 ? (
+        <p className="py-10 text-center text-sm text-muted">
+          You haven&apos;t ordered yet.
+        </p>
+      ) : (
+        orders.map((o) => {
+          const live = liveById[o.id];
+          const status = live?.status ?? o.status;
+          const paid = (live?.paymentStatus ?? o.paymentStatus) === 'paid';
+          const sv = STATUS_VIEW[status];
+          return (
+            <div
+              key={o.id}
+              className="rounded-xl border border-border bg-subtle/40 p-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-sm font-semibold">
+                  {o.orderNumber}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      'rounded-full px-2 py-0.5 text-[11px] font-medium',
+                      sv.cls,
+                    )}
+                  >
+                    {sv.label}
+                  </span>
+                  {paid && (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100">
+                      Paid
+                    </span>
+                  )}
+                </div>
+              </div>
+              <ul className="mt-2 space-y-0.5 text-sm text-muted">
+                {o.items.map((it, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: static snapshot list
+                  <li key={i}>
+                    {it.quantity}× {it.name}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-2 flex items-center justify-between text-xs text-muted">
+                <span>
+                  {o.tableLabel ? `Table ${o.tableLabel} · ` : ''}
+                  {formatTime(o.placedAt)}
+                </span>
+                <span className="text-sm font-semibold text-fg tabular-nums">
+                  {formatRupees(o.totalPaise)}
+                </span>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
   );
 }

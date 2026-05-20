@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -142,16 +141,6 @@ export function LoginForm() {
       <Button type="submit" loading={submitting} className="w-full" size="lg">
         {submitting ? 'Signing in' : 'Sign in'}
       </Button>
-
-      <p className="text-xs text-muted text-center pt-2">
-        New to Sangam?{' '}
-        <Link
-          href="/signup"
-          className="text-fg font-medium hover:underline underline-offset-4"
-        >
-          Create an account
-        </Link>
-      </p>
     </form>
   );
 }

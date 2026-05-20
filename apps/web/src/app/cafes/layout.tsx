@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Button } from '@/components/ui/button';
+import { TriquetraMark } from '@/components/ui/logo';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { signOutAction } from './actions';
 
@@ -28,9 +29,7 @@ export default async function CafesLayout({
       <header className="sticky top-0 z-30 border-b border-border bg-bg/80 backdrop-blur supports-[backdrop-filter]:bg-bg/60">
         <div className="mx-auto max-w-6xl px-6 py-3 flex items-center justify-between">
           <Link href="/cafes" className="inline-flex items-center gap-2">
-            <span className="size-6 rounded-md bg-accent text-accent-fg grid place-items-center text-[11px] font-bold">
-              S
-            </span>
+            <TriquetraMark className="size-6 shrink-0 text-accent" />
             <span className="text-sm font-semibold tracking-tight">
               Sangam
             </span>
@@ -53,13 +52,6 @@ export default async function CafesLayout({
       <main id="main-content" className="flex-1">
         <div className="mx-auto max-w-6xl px-6 py-10">{children}</div>
       </main>
-
-      <footer className="border-t border-border">
-        <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between text-xs text-muted">
-          <span>© {new Date().getFullYear()} Sangam</span>
-          <span className="font-mono">v0.0.1</span>
-        </div>
-      </footer>
     </div>
   );
 }

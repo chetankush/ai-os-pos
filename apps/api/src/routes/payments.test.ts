@@ -44,6 +44,7 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
     status: 'pending',
     source: 'qr',
     tableLabel: 'T1',
+    tableSessionId: null,
     customerName: null,
     customerPhone: null,
     notes: null,
@@ -80,6 +81,7 @@ function createMockOrdersRepo() {
   return {
     create: vi.fn(),
     listByCafe: vi.fn(),
+    listBySession: vi.fn(),
     findByIdAndCafe: vi.fn(),
     updateStatus: vi.fn(),
     todayStats: vi.fn(),

@@ -21,12 +21,19 @@ import {
   UtensilsCrossed,
   X,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field } from '@/components/ui/label';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { cn } from '@/lib/cn';
+import {
+  addDinerOrder,
+  type DinerOrderRecord,
+  getDinerOrders,
+  updateDinerOrder,
+} from '@/lib/diner-orders';
 import { loadRazorpay } from '@/lib/razorpay';
 import { AiWidget } from './ai-widget';
 
@@ -66,6 +73,9 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
 
   const [placed, setPlaced] = useState<PublicOrder | null>(null);
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>('counter');
+  // This device's own orders at this cafe (localStorage) — shown in the chatbot.
+  const [history, setHistory] = useState<DinerOrderRecord[]>([]);
+  useEffect(() => setHistory(getDinerOrders(slug)), [slug]);
   // Tracks the in-flight Razorpay round-trip (create + checkout + verify) so the
   // retry CTA can show a spinner without blocking the rest of the screen.
   const [paying, setPaying] = useState(false);
@@ -222,6 +232,7 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
             const data = (await verifyRes.json()) as VerifyPaymentResponse;
             setPlaced(data.order);
             setConfirmKind('paid');
+            setHistory(updateDinerOrder(slug, data.order.id, { paymentStatus: 'paid' }));
           } catch (err) {
             toast.error(
               err instanceof Error ? err.message : 'Payment could not be confirmed.',
@@ -284,6 +295,12 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
       return;
     }
 
+    // Snapshot the item names now — the cart is cleared on success.
+    const orderedItems = cartLines.map((l) => ({
+      name: l.item.name,
+      quantity: l.quantity,
+    }));
+
     const body = {
       ...(table ? { tableLabel: table } : {}),
       ...(customerName.trim() ? { customerName: customerName.trim() } : {}),
@@ -315,6 +332,18 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
       setPlaced(order);
       setCartOpen(false);
       setCart(new Map());
+      setHistory(
+        addDinerOrder(slug, {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          totalPaise: order.totalPaise,
+          items: orderedItems,
+          tableLabel: order.tableLabel ?? table ?? null,
+          status: order.status,
+          paymentStatus: order.paymentStatus,
+          placedAt: new Date().toISOString(),
+        }),
+      );
 
       if (prepaid) {
         // Prepaid: payment is mandatory, so jump straight into Checkout. The
@@ -383,6 +412,7 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
               Table {table}
             </span>
           )}
+          <ThemeToggle className="shrink-0" />
         </div>
       </header>
 
@@ -465,6 +495,7 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
         itemCount={itemCount}
         subtotalPaise={subtotalPaise}
         onViewCart={() => setCartOpen(true)}
+        orders={history}
       />
 
       {/* ─── Sticky cart bar ──────────────────────────────────────────────── */}

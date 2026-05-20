@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { TriquetraMark } from '@/components/ui/logo';
 import { FadeIn } from '@/components/ui/motion';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 
@@ -14,9 +15,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               href="/"
               className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight"
             >
-              <span className="size-6 rounded-md bg-accent text-accent-fg grid place-items-center text-[11px] font-bold">
-                S
-              </span>
+              <TriquetraMark className="size-6 shrink-0 text-accent" />
               Sangam
             </Link>
           </FadeIn>
@@ -34,10 +33,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <FadeIn delay={0.15}>
           <div className="space-y-4 max-w-md">
             <h2 className="text-3xl font-semibold tracking-tight leading-tight">
-              The POS your cafe deserves.
+              The POS your restaurant &amp; cafe deserves.
             </h2>
             <p className="text-sm text-muted leading-relaxed">
-              Built for Indian cafes and restaurants. Flat pricing, no
+              Built for Indian restaurants and cafes. Flat pricing, no
               commissions. AI waiter that lifts average order value by 15%.
             </p>
           </div>

@@ -54,13 +54,14 @@ const TERMINAL_MESSAGE: Record<'completed' | 'cancelled', string> = {
   cancelled: 'This order is cancelled.',
 };
 
+// UPI first — it's the default at most Indian counters.
 const PAYMENT_OPTIONS: {
   method: PaymentMethod;
   label: string;
   icon: React.ReactNode;
 }[] = [
-  { method: 'cash', label: 'Cash', icon: <Banknote className="size-4" /> },
   { method: 'upi', label: 'UPI', icon: <Smartphone className="size-4" /> },
+  { method: 'cash', label: 'Cash', icon: <Banknote className="size-4" /> },
   { method: 'card', label: 'Card', icon: <CreditCard className="size-4" /> },
 ];
 
@@ -121,7 +122,7 @@ export function OrderActions({
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [payingOpen, setPayingOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi');
 
   async function transition(
     next: OrderStatus,
