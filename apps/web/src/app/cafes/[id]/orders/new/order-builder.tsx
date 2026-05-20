@@ -11,6 +11,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Minus, Plus, Search, ShoppingBag, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field } from '@/components/ui/label';
@@ -27,12 +28,12 @@ interface Props {
 interface CartLine {
   menuItem: MenuItem;
   quantity: number;
-  notes?: string;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 const PHONE_RE = /^\+?\d{7,15}$/;
 const MAX_QTY = 99;
+const ALL = '__all__';
 
 async function authedFetch(path: string, init: RequestInit = {}) {
   const supabase = createSupabaseBrowserClient();
@@ -52,6 +53,12 @@ async function authedFetch(path: string, init: RequestInit = {}) {
   return res.json();
 }
 
+function formatRupees(paise: number): string {
+  return `₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(
+    Math.round(paise / 100),
+  )}`;
+}
+
 export function OrderBuilder({ cafeId, cafe, categories }: Props) {
   const router = useRouter();
   const [cart, setCart] = useState<Map<string, CartLine>>(new Map());
@@ -60,11 +67,12 @@ export function OrderBuilder({ cafeId, cafe, categories }: Props) {
   const [customerPhone, setCustomerPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [search, setSearch] = useState('');
+  const [activeCat, setActiveCat] = useState<string>(ALL);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
-  // ─── Cart mutations ────────────────────────────────────────────────────────
+  // ─── Cart mutations ──────────────────────────────────────────────────────────
 
   function addItem(item: MenuItem) {
     setCart((prev) => {
@@ -86,14 +94,8 @@ export function OrderBuilder({ cafeId, cafe, categories }: Props) {
       const next = new Map(prev);
       const existing = next.get(itemId);
       if (!existing) return prev;
-      if (qty <= 0) {
-        next.delete(itemId);
-      } else {
-        next.set(itemId, {
-          ...existing,
-          quantity: Math.min(MAX_QTY, qty),
-        });
-      }
+      if (qty <= 0) next.delete(itemId);
+      else next.set(itemId, { ...existing, quantity: Math.min(MAX_QTY, qty) });
       return next;
     });
   }
@@ -106,51 +108,52 @@ export function OrderBuilder({ cafeId, cafe, categories }: Props) {
     });
   }
 
-  // ─── Derived totals ────────────────────────────────────────────────────────
+  // ─── Derived ─────────────────────────────────────────────────────────────────
 
   const cartLines = useMemo(() => Array.from(cart.values()), [cart]);
   const itemCount = useMemo(
-    () => cartLines.reduce((sum, l) => sum + l.quantity, 0),
+    () => cartLines.reduce((s, l) => s + l.quantity, 0),
     [cartLines],
   );
   const subtotalPaise = useMemo(
-    () =>
-      cartLines.reduce(
-        (sum, l) => sum + l.menuItem.basePricePaise * l.quantity,
-        0,
-      ),
+    () => cartLines.reduce((s, l) => s + l.menuItem.basePricePaise * l.quantity, 0),
     [cartLines],
   );
   const gstRateBp = cafe.isAirConditioned ? 1800 : 500;
   const taxPaise = Math.round((subtotalPaise * gstRateBp) / 10000);
   const totalPaise = subtotalPaise + taxPaise;
 
-  // ─── Filtered menu ─────────────────────────────────────────────────────────
+  // Available categories that actually have available items.
+  const liveCategories = useMemo(
+    () =>
+      categories
+        .map((c) => ({ ...c, items: c.items.filter((i) => i.isAvailable) }))
+        .filter((c) => c.items.length > 0),
+    [categories],
+  );
 
-  const filteredCategories = useMemo(() => {
+  // Flat, filtered item list for the dense pad (search + active category).
+  const visibleCategories = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return categories
-      .map((cat) => ({
-        ...cat,
-        items: cat.items.filter(
-          (item) =>
-            item.isAvailable &&
-            (q === '' || item.name.toLowerCase().includes(q)),
-        ),
+    return liveCategories
+      .filter((c) => activeCat === ALL || c.id === activeCat)
+      .map((c) => ({
+        ...c,
+        items: c.items.filter((i) => q === '' || i.name.toLowerCase().includes(q)),
       }))
-      .filter((cat) => cat.items.length > 0);
-  }, [categories, search]);
+      .filter((c) => c.items.length > 0);
+  }, [liveCategories, activeCat, search]);
 
-  // ─── Submit ────────────────────────────────────────────────────────────────
+  const hasMenu = liveCategories.length > 0;
+
+  // ─── Submit ──────────────────────────────────────────────────────────────────
 
   async function handleSubmit() {
     setError(null);
-
     if (cartLines.length === 0) {
       setError('Add at least one item');
       return;
     }
-
     const trimmedPhone = customerPhone.trim();
     if (trimmedPhone && !PHONE_RE.test(trimmedPhone)) {
       setError('Enter a valid phone number');
@@ -159,11 +162,7 @@ export function OrderBuilder({ cafeId, cafe, categories }: Props) {
 
     const body: CreateOrderRequest = {
       source: 'counter',
-      items: cartLines.map((line) => ({
-        menuItemId: line.menuItem.id,
-        quantity: line.quantity,
-        ...(line.notes ? { notes: line.notes } : {}),
-      })),
+      items: cartLines.map((l) => ({ menuItemId: l.menuItem.id, quantity: l.quantity })),
       ...(customerName.trim() ? { customerName: customerName.trim() } : {}),
       ...(trimmedPhone ? { customerPhone: trimmedPhone } : {}),
       ...(tableLabel.trim() ? { tableLabel: tableLabel.trim() } : {}),
@@ -176,6 +175,7 @@ export function OrderBuilder({ cafeId, cafe, categories }: Props) {
         method: 'POST',
         body: JSON.stringify(body),
       })) as OrderResponse;
+      toast.success(`Order ${data.order.orderNumber} placed`);
       router.push(`/cafes/${cafeId}/orders/${data.order.id}`);
       router.refresh();
     } catch (err) {
@@ -184,20 +184,47 @@ export function OrderBuilder({ cafeId, cafe, categories }: Props) {
     }
   }
 
-  // ─── Render ────────────────────────────────────────────────────────────────
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
-  const hasMenu = categories.some((c) =>
-    c.items.some((i) => i.isAvailable),
-  );
+  const cartProps = {
+    cartLines,
+    itemCount,
+    subtotalPaise,
+    taxPaise,
+    totalPaise,
+    gstRateBp,
+    tableLabel,
+    setTableLabel,
+    customerName,
+    setCustomerName,
+    customerPhone,
+    setCustomerPhone,
+    notes,
+    setNotes,
+    error,
+    submitting,
+    onInc: (id: string) => {
+      const l = cart.get(id);
+      if (l) setQuantity(id, l.quantity + 1);
+    },
+    onDec: (id: string) => {
+      const l = cart.get(id);
+      if (l) setQuantity(id, l.quantity - 1);
+    },
+    onRemove: removeItem,
+    onSubmit: handleSubmit,
+  };
 
   return (
     <>
       <div className="grid gap-6 lg:grid-cols-5">
-        {/* Menu picker ──────────────────────────────────────────────────── */}
-        <div className="lg:col-span-3 space-y-5">
+        {/* ─── Fast item pad ─────────────────────────────────────────────── */}
+        <div className="lg:col-span-3 space-y-3">
+          {/* Search */}
           <div className="relative">
             <Search className="size-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <Input
+              autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search items…"
@@ -206,38 +233,55 @@ export function OrderBuilder({ cafeId, cafe, categories }: Props) {
             />
           </div>
 
+          {/* Category chips — tap to jump/filter */}
+          {hasMenu && (
+            <div className="sticky top-14 z-20 -mx-1 flex gap-2 overflow-x-auto bg-bg/95 px-1 py-2 backdrop-blur">
+              <Chip active={activeCat === ALL} onClick={() => setActiveCat(ALL)}>
+                All
+              </Chip>
+              {liveCategories.map((c) => (
+                <Chip
+                  key={c.id}
+                  active={activeCat === c.id}
+                  onClick={() => setActiveCat(c.id)}
+                >
+                  {c.name}
+                </Chip>
+              ))}
+            </div>
+          )}
+
+          {/* Item tiles */}
           {!hasMenu ? (
             <Card className="p-12 text-center border-dashed">
               <p className="text-sm text-muted">
-                No available menu items. Add items in the menu editor first.
+                No available items. Add items in the menu editor first.
               </p>
             </Card>
-          ) : filteredCategories.length === 0 ? (
+          ) : visibleCategories.length === 0 ? (
             <Card className="p-8 text-center border-dashed">
-              <p className="text-sm text-muted">
-                No items match &ldquo;{search}&rdquo;.
-              </p>
+              <p className="text-sm text-muted">No items match “{search}”.</p>
             </Card>
           ) : (
-            <div className="space-y-6">
-              {filteredCategories.map((cat) => (
-                <section key={cat.id} className="space-y-3">
-                  <div className="flex items-baseline justify-between">
-                    <h2 className="text-sm font-semibold tracking-tight">
+            <div className="space-y-5">
+              {visibleCategories.map((cat) => (
+                <section key={cat.id} className="space-y-2">
+                  {activeCat === ALL && (
+                    <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
                       {cat.name}
                     </h2>
-                    <span className="text-[11px] text-muted">
-                      {cat.items.length}{' '}
-                      {cat.items.length === 1 ? 'item' : 'items'}
-                    </span>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  )}
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {cat.items.map((item) => (
-                      <MenuItemButton
+                      <ItemTile
                         key={item.id}
                         item={item}
-                        inCartQty={cart.get(item.id)?.quantity ?? 0}
+                        qty={cart.get(item.id)?.quantity ?? 0}
                         onAdd={() => addItem(item)}
+                        onDec={() => {
+                          const l = cart.get(item.id);
+                          if (l) setQuantity(item.id, l.quantity - 1);
+                        }}
                       />
                     ))}
                   </div>
@@ -247,65 +291,37 @@ export function OrderBuilder({ cafeId, cafe, categories }: Props) {
           )}
         </div>
 
-        {/* Cart panel (desktop) ─────────────────────────────────────────── */}
+        {/* ─── Cart (desktop, sticky) ────────────────────────────────────── */}
         <div className="lg:col-span-2 hidden lg:block">
-          <div className="lg:sticky lg:top-24">
-            <CartPanel
-              cartLines={cartLines}
-              itemCount={itemCount}
-              subtotalPaise={subtotalPaise}
-              taxPaise={taxPaise}
-              totalPaise={totalPaise}
-              gstRateBp={gstRateBp}
-              tableLabel={tableLabel}
-              setTableLabel={setTableLabel}
-              customerName={customerName}
-              setCustomerName={setCustomerName}
-              customerPhone={customerPhone}
-              setCustomerPhone={setCustomerPhone}
-              notes={notes}
-              setNotes={setNotes}
-              error={error}
-              submitting={submitting}
-              onIncrement={(id) => {
-                const line = cart.get(id);
-                if (line) setQuantity(id, line.quantity + 1);
-              }}
-              onDecrement={(id) => {
-                const line = cart.get(id);
-                if (line) setQuantity(id, line.quantity - 1);
-              }}
-              onRemove={removeItem}
-              onSubmit={handleSubmit}
-            />
+          <div className="lg:sticky lg:top-20">
+            <CartPanel {...cartProps} />
           </div>
         </div>
-
-        {/* On mobile the cart lives only in the slide-up drawer (below),
-            opened by the floating pill — no redundant inline copy. */}
       </div>
 
-      {/* Mobile floating cart toggle ─────────────────────────────────────── */}
+      {/* ─── Mobile floating cart pill ───────────────────────────────────── */}
       {itemCount > 0 && (
         <button
           type="button"
           onClick={() => setMobileCartOpen(true)}
           className={cn(
-            'lg:hidden fixed bottom-4 right-4 z-40',
-            'inline-flex items-center gap-2 px-4 h-12 rounded-full',
-            'bg-accent text-accent-fg shadow-lg shadow-black/10',
-            'active:scale-[0.98] transition-transform',
+            'lg:hidden fixed bottom-4 inset-x-4 z-40 h-14 rounded-full',
+            'flex items-center justify-between px-5',
+            'bg-accent text-accent-fg shadow-lg shadow-black/15',
+            'active:scale-[0.99] transition-transform',
           )}
         >
-          <ShoppingBag className="size-4" />
-          <span className="text-sm font-medium">
-            {itemCount} {itemCount === 1 ? 'item' : 'items'} ·{' '}
-            {formatRupees(totalPaise)}
+          <span className="inline-flex items-center gap-2 text-sm font-medium">
+            <ShoppingBag className="size-4" />
+            {itemCount} {itemCount === 1 ? 'item' : 'items'}
+          </span>
+          <span className="text-sm font-semibold tabular-nums">
+            {formatRupees(totalPaise)} · Review
           </span>
         </button>
       )}
 
-      {/* Mobile cart drawer ─────────────────────────────────────────────── */}
+      {/* ─── Mobile cart drawer ──────────────────────────────────────────── */}
       <AnimatePresence>
         {mobileCartOpen && (
           <motion.div
@@ -321,55 +337,27 @@ export function OrderBuilder({ cafeId, cafe, categories }: Props) {
               className="absolute inset-0 bg-black/40"
             />
             <motion.div
-              className="relative w-full max-h-[85vh] overflow-y-auto bg-bg rounded-t-xl border-t border-border"
+              className="relative w-full max-h-[88vh] overflow-y-auto rounded-t-2xl border-t border-border bg-bg"
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'tween', duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             >
-              <div className="sticky top-0 z-10 flex items-center justify-between p-4 bg-bg border-b border-border">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-bg p-4">
                 <h2 className="text-base font-semibold tracking-tight">
-                  Cart ({itemCount} {itemCount === 1 ? 'item' : 'items'})
+                  Cart ({itemCount})
                 </h2>
                 <button
                   type="button"
                   onClick={() => setMobileCartOpen(false)}
                   aria-label="Close"
-                  className="p-1.5 rounded-md hover:bg-subtle text-muted hover:text-fg transition-colors"
+                  className="grid size-9 place-items-center rounded-md text-muted hover:bg-subtle hover:text-fg"
                 >
                   <X className="size-4" />
                 </button>
               </div>
               <div className="p-4">
-                <CartPanel
-                  embedded
-                  cartLines={cartLines}
-                  itemCount={itemCount}
-                  subtotalPaise={subtotalPaise}
-                  taxPaise={taxPaise}
-                  totalPaise={totalPaise}
-                  gstRateBp={gstRateBp}
-                  tableLabel={tableLabel}
-                  setTableLabel={setTableLabel}
-                  customerName={customerName}
-                  setCustomerName={setCustomerName}
-                  customerPhone={customerPhone}
-                  setCustomerPhone={setCustomerPhone}
-                  notes={notes}
-                  setNotes={setNotes}
-                  error={error}
-                  submitting={submitting}
-                  onIncrement={(id) => {
-                    const line = cart.get(id);
-                    if (line) setQuantity(id, line.quantity + 1);
-                  }}
-                  onDecrement={(id) => {
-                    const line = cart.get(id);
-                    if (line) setQuantity(id, line.quantity - 1);
-                  }}
-                  onRemove={removeItem}
-                  onSubmit={handleSubmit}
-                />
+                <CartPanel {...cartProps} embedded />
               </div>
             </motion.div>
           </motion.div>
@@ -379,78 +367,112 @@ export function OrderBuilder({ cafeId, cafe, categories }: Props) {
   );
 }
 
-// ─── MenuItemButton ──────────────────────────────────────────────────────────
+// ─── Category chip ─────────────────────────────────────────────────────────────
 
-function MenuItemButton({
-  item,
-  inCartQty,
-  onAdd,
+function Chip({
+  active,
+  onClick,
+  children,
 }: {
-  item: MenuItem;
-  inCartQty: number;
-  onAdd: () => void;
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
-      onClick={onAdd}
-      disabled={!item.isAvailable}
+      onClick={onClick}
       className={cn(
-        'group relative text-left rounded-lg border border-border bg-bg',
-        'px-3 py-3 transition-all duration-150',
-        'hover:border-border-strong hover:bg-subtle/40',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2',
-        'active:scale-[0.99]',
-        !item.isAvailable && 'opacity-50 cursor-not-allowed',
+        'h-9 shrink-0 rounded-full border px-3.5 text-sm font-medium whitespace-nowrap transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
+        active
+          ? 'border-fg bg-accent text-accent-fg'
+          : 'border-border text-muted hover:border-border-strong hover:text-fg',
       )}
     >
-      <div className="flex items-start gap-2.5">
-        <span
-          role="img"
-          aria-label={item.isVegetarian ? 'Vegetarian' : 'Non-vegetarian'}
-          title={item.isVegetarian ? 'Vegetarian' : 'Non-vegetarian'}
-          className={cn(
-            'mt-0.5 size-3.5 rounded-sm border-2 flex items-center justify-center shrink-0',
-            item.isVegetarian ? 'border-success' : 'border-danger',
-          )}
-        >
-          <span
-            aria-hidden
-            className={cn(
-              'size-1.5 rounded-full',
-              item.isVegetarian ? 'bg-success' : 'bg-danger',
-            )}
-          />
-        </span>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{item.name}</p>
-          {item.description && (
-            <p className="mt-0.5 text-xs text-muted line-clamp-1">
-              {item.description}
-            </p>
-          )}
-          <p className="mt-1.5 font-mono text-xs tabular-nums text-fg">
-            {formatRupees(item.basePricePaise)}
-          </p>
-        </div>
-        {inCartQty > 0 && (
-          <span
-            className={cn(
-              'shrink-0 inline-flex items-center justify-center',
-              'min-w-5 h-5 px-1.5 rounded-full bg-accent text-accent-fg',
-              'text-[11px] font-semibold tabular-nums',
-            )}
-            aria-label={`${inCartQty} in cart`}
-          >
-            {inCartQty}
-          </span>
-        )}
-      </div>
+      {children}
     </button>
   );
 }
 
-// ─── CartPanel ───────────────────────────────────────────────────────────────
+// ─── Item tile (the fast tap target) ────────────────────────────────────────────
+
+function ItemTile({
+  item,
+  qty,
+  onAdd,
+  onDec,
+}: {
+  item: MenuItem;
+  qty: number;
+  onAdd: () => void;
+  onDec: () => void;
+}) {
+  const dietLabel = item.isVegetarian ? 'Vegetarian' : 'Non-vegetarian';
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onAdd}
+        className={cn(
+          'flex h-24 w-full flex-col justify-between rounded-xl border bg-bg p-3 text-left',
+          'transition-all duration-100 touch-manipulation active:scale-[0.98]',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
+          qty > 0
+            ? 'border-fg ring-1 ring-fg'
+            : 'border-border hover:border-border-strong hover:bg-subtle/50',
+        )}
+      >
+        <div className="flex items-start gap-1.5">
+          <span
+            role="img"
+            aria-label={dietLabel}
+            className={cn(
+              'mt-0.5 size-3 shrink-0 rounded-sm border-2',
+              item.isVegetarian ? 'border-success' : 'border-danger',
+            )}
+          >
+            <span
+              aria-hidden
+              className={cn(
+                'block size-full scale-50 rounded-full',
+                item.isVegetarian ? 'bg-success' : 'bg-danger',
+              )}
+            />
+          </span>
+          <span className="line-clamp-2 text-sm font-medium leading-tight">
+            {item.name}
+          </span>
+        </div>
+        <span className="font-mono text-sm tabular-nums">
+          {formatRupees(item.basePricePaise)}
+        </span>
+      </button>
+
+      {/* In-tile quantity controls — adjust without opening the cart */}
+      {qty > 0 && (
+        <button
+          type="button"
+          onClick={onDec}
+          aria-label={`Remove one ${item.name}`}
+          className="absolute bottom-2 right-2 grid size-8 place-items-center rounded-lg border border-border bg-bg text-fg shadow-sm hover:bg-subtle"
+        >
+          <Minus className="size-3.5" />
+        </button>
+      )}
+      {qty > 0 && (
+        <span
+          aria-label={`${qty} in cart`}
+          className="absolute -right-1.5 -top-1.5 grid min-w-6 place-items-center rounded-full bg-accent px-1.5 py-0.5 text-xs font-semibold tabular-nums text-accent-fg shadow"
+        >
+          {qty}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ─── Cart panel ──────────────────────────────────────────────────────────────
 
 interface CartPanelProps {
   cartLines: CartLine[];
@@ -469,8 +491,8 @@ interface CartPanelProps {
   setNotes: (v: string) => void;
   error: string | null;
   submitting: boolean;
-  onIncrement: (id: string) => void;
-  onDecrement: (id: string) => void;
+  onInc: (id: string) => void;
+  onDec: (id: string) => void;
   onRemove: (id: string) => void;
   onSubmit: () => void;
   embedded?: boolean;
@@ -494,12 +516,13 @@ function CartPanel(props: CartPanelProps) {
     setNotes,
     error,
     submitting,
-    onIncrement,
-    onDecrement,
+    onInc,
+    onDec,
     onRemove,
     onSubmit,
     embedded,
   } = props;
+  const [showDetails, setShowDetails] = useState(false);
 
   const body = (
     <>
@@ -513,8 +536,8 @@ function CartPanel(props: CartPanelProps) {
       )}
 
       {cartLines.length === 0 ? (
-        <p className="text-sm text-muted py-6 text-center">
-          Cart is empty — tap an item to add
+        <p className="py-8 text-center text-sm text-muted">
+          Tap items to build the order
         </p>
       ) : (
         <ul className="divide-y divide-border">
@@ -526,87 +549,42 @@ function CartPanel(props: CartPanelProps) {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
               >
-                <div className="py-3 flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span
-                        role="img"
-                        aria-label={
-                          line.menuItem.isVegetarian
-                            ? 'Vegetarian'
-                            : 'Non-vegetarian'
-                        }
-                        className={cn(
-                          'size-2.5 rounded-sm border-2 flex items-center justify-center shrink-0',
-                          line.menuItem.isVegetarian
-                            ? 'border-success'
-                            : 'border-danger',
-                        )}
-                      >
-                        <span
-                          aria-hidden
-                          className={cn(
-                            'size-1 rounded-full',
-                            line.menuItem.isVegetarian
-                              ? 'bg-success'
-                              : 'bg-danger',
-                          )}
-                        />
-                      </span>
-                      <p className="text-sm font-medium truncate">
-                        {line.menuItem.name}
-                      </p>
-                    </div>
-                    <p className="mt-0.5 text-[11px] text-muted tabular-nums">
-                      {formatRupees(line.menuItem.basePricePaise)} ×{' '}
-                      {line.quantity} ={' '}
-                      <span className="text-fg font-medium">
-                        {formatRupees(
-                          line.menuItem.basePricePaise * line.quantity,
-                        )}
-                      </span>
+                <div className="flex items-center gap-2 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{line.menuItem.name}</p>
+                    <p className="text-[11px] tabular-nums text-muted">
+                      {formatRupees(line.menuItem.basePricePaise * line.quantity)}
                     </p>
                   </div>
-
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => onDecrement(line.menuItem.id)}
-                      disabled={line.quantity <= 1}
+                      onClick={() => onDec(line.menuItem.id)}
                       aria-label={`Decrease ${line.menuItem.name}`}
-                      className={cn(
-                        'size-11 grid place-items-center rounded-md border border-border bg-bg',
-                        'text-fg hover:bg-subtle transition-colors',
-                        'disabled:opacity-40 disabled:cursor-not-allowed',
-                      )}
+                      className="grid size-9 place-items-center rounded-md border border-border bg-bg hover:bg-subtle"
                     >
-                      <Minus className="size-3" />
+                      <Minus className="size-3.5" />
                     </button>
-                    <span className="min-w-6 text-center text-sm font-medium tabular-nums">
+                    <span className="min-w-6 text-center text-sm font-semibold tabular-nums">
                       {line.quantity}
                     </span>
                     <button
                       type="button"
-                      onClick={() => onIncrement(line.menuItem.id)}
-                      disabled={line.quantity >= MAX_QTY}
+                      onClick={() => onInc(line.menuItem.id)}
                       aria-label={`Increase ${line.menuItem.name}`}
-                      className={cn(
-                        'size-11 grid place-items-center rounded-md border border-border bg-bg',
-                        'text-fg hover:bg-subtle transition-colors',
-                        'disabled:opacity-40 disabled:cursor-not-allowed',
-                      )}
+                      className="grid size-9 place-items-center rounded-md border border-border bg-bg hover:bg-subtle"
                     >
-                      <Plus className="size-3" />
+                      <Plus className="size-3.5" />
                     </button>
                     <button
                       type="button"
                       onClick={() => onRemove(line.menuItem.id)}
                       aria-label={`Remove ${line.menuItem.name}`}
-                      className="ml-1 size-9 grid place-items-center rounded-md text-muted hover:text-danger hover:bg-danger/5 transition-colors"
+                      className="ml-0.5 grid size-9 place-items-center rounded-md text-muted hover:bg-danger/5 hover:text-danger"
                     >
-                      <Trash2 className="size-3" />
+                      <Trash2 className="size-3.5" />
                     </button>
                   </div>
                 </div>
@@ -617,18 +595,14 @@ function CartPanel(props: CartPanelProps) {
       )}
 
       {/* Totals */}
-      <div className="space-y-1.5 pt-4 border-t border-border">
+      <div className="space-y-1.5 border-t border-border pt-3">
+        <Row label="Subtotal" value={formatRupees(subtotalPaise)} muted />
         <Row
-          label="Subtotal"
-          value={formatRupees(subtotalPaise)}
-          muted
-        />
-        <Row
-          label={`Tax (${(gstRateBp / 100).toFixed(0)}% GST)`}
+          label={`GST (${(gstRateBp / 100).toFixed(0)}%)`}
           value={formatRupees(taxPaise)}
           muted
         />
-        <div className="pt-2 border-t border-border flex items-baseline justify-between">
+        <div className="flex items-baseline justify-between border-t border-border pt-2">
           <span className="text-sm font-semibold">Total</span>
           <span className="text-lg font-semibold tabular-nums">
             {formatRupees(totalPaise)}
@@ -636,49 +610,58 @@ function CartPanel(props: CartPanelProps) {
         </div>
       </div>
 
-      {/* Customer / table */}
-      <div className="space-y-3 pt-2">
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Table" hint="Optional" htmlFor="o-table">
+      {/* Optional details — collapsed by default to keep the flow fast */}
+      <button
+        type="button"
+        onClick={() => setShowDetails((s) => !s)}
+        className="text-xs text-muted hover:text-fg transition-colors"
+      >
+        {showDetails ? 'Hide' : 'Add'} table / customer details
+      </button>
+      {showDetails && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Table" htmlFor="o-table">
+              <Input
+                id="o-table"
+                value={tableLabel}
+                onChange={(e) => setTableLabel(e.target.value)}
+                placeholder="T1"
+                maxLength={20}
+              />
+            </Field>
+            <Field label="Customer" htmlFor="o-name">
+              <Input
+                id="o-name"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Walk-in"
+                maxLength={120}
+              />
+            </Field>
+          </div>
+          <Field label="Phone" htmlFor="o-phone">
             <Input
-              id="o-table"
-              value={tableLabel}
-              onChange={(e) => setTableLabel(e.target.value)}
-              placeholder="T1"
+              id="o-phone"
+              type="tel"
+              inputMode="tel"
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              placeholder="98765 43210"
               maxLength={20}
             />
           </Field>
-          <Field label="Customer" hint="Optional" htmlFor="o-name">
+          <Field label="Order notes" htmlFor="o-notes">
             <Input
-              id="o-name"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Walk-in"
-              maxLength={120}
+              id="o-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Extra spicy, no onion…"
+              maxLength={500}
             />
           </Field>
         </div>
-        <Field label="Phone" hint="Optional" htmlFor="o-phone">
-          <Input
-            id="o-phone"
-            type="tel"
-            inputMode="tel"
-            value={customerPhone}
-            onChange={(e) => setCustomerPhone(e.target.value)}
-            placeholder="+91 98765 43210"
-            maxLength={20}
-          />
-        </Field>
-        <Field label="Order notes" hint="Optional" htmlFor="o-notes">
-          <Input
-            id="o-notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Extra spicy, no onion, etc."
-            maxLength={500}
-          />
-        </Field>
-      </div>
+      )}
 
       <Button
         type="button"
@@ -689,7 +672,7 @@ function CartPanel(props: CartPanelProps) {
         onClick={onSubmit}
       >
         {submitting
-          ? 'Creating order'
+          ? 'Placing order'
           : cartLines.length === 0
             ? 'Add items to continue'
             : `Place order · ${formatRupees(totalPaise)}`}
@@ -697,52 +680,30 @@ function CartPanel(props: CartPanelProps) {
     </>
   );
 
-  if (embedded) {
-    return <div className="space-y-4">{body}</div>;
-  }
+  if (embedded) return <div className="space-y-4">{body}</div>;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>
           Cart{' '}
-          <span className="text-muted font-normal">
+          <span className="font-normal text-muted">
             ({itemCount} {itemCount === 1 ? 'item' : 'items'})
           </span>
         </CardTitle>
       </CardHeader>
-      <CardBody className="pt-0 space-y-4">{body}</CardBody>
+      <CardBody className="space-y-4 pt-0">{body}</CardBody>
     </Card>
   );
 }
 
-function Row({
-  label,
-  value,
-  muted,
-}: {
-  label: string;
-  value: string;
-  muted?: boolean;
-}) {
+function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
     <div className="flex items-baseline justify-between text-xs">
       <span className={muted ? 'text-muted' : 'text-fg'}>{label}</span>
-      <span
-        className={cn(
-          'tabular-nums',
-          muted ? 'text-muted' : 'text-fg font-medium',
-        )}
-      >
+      <span className={cn('tabular-nums', muted ? 'text-muted' : 'font-medium text-fg')}>
         {value}
       </span>
     </div>
   );
-}
-
-// ─── helpers ─────────────────────────────────────────────────────────────────
-
-function formatRupees(paise: number): string {
-  const rupees = Math.round(paise / 100);
-  return `₹${rupees.toLocaleString('en-IN')}`;
 }
