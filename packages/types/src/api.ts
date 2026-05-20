@@ -10,6 +10,7 @@ import type {
   Order,
   OrderStatus,
   OrderWithItems,
+  PaymentMethod,
   SettleConfig,
   SettleReport,
   SettleStatement,
@@ -132,10 +133,6 @@ export interface CreateOrderRequest {
   }>;
 }
 
-export interface UpdateOrderStatusRequest {
-  status: OrderStatus;
-}
-
 export interface OrderResponse {
   order: OrderWithItems;
 }
@@ -147,7 +144,14 @@ export interface OrdersListResponse {
 export interface OrderStatsResponse {
   todayCount: number;
   todayRevenuePaise: number;
+  todayGstPaise: number;
   byStatus: Record<OrderStatus, number>;
+  paymentBreakdownPaise: Record<PaymentMethod, number>;
+}
+
+export interface UpdateOrderStatusRequest {
+  status: OrderStatus;
+  paymentMethod?: PaymentMethod;
 }
 
 // ─── Settle ─────────────────────────────────────────────────────────────────

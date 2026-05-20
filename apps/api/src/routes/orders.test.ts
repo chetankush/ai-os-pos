@@ -81,6 +81,7 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
     taxPaise: 1500,
     totalPaise: 31500,
     gstRateBp: 500,
+    paymentMethod: null,
     createdAt: '2026-05-20T00:00:00.000Z',
     updatedAt: '2026-05-20T00:00:00.000Z',
     paidAt: null,
@@ -273,6 +274,7 @@ describe('orders endpoints', () => {
       ordersRepo.todayStats.mockResolvedValueOnce({
         todayCount: 7,
         todayRevenuePaise: 250000,
+        todayGstPaise: 12500,
         byStatus: {
           pending: 2,
           preparing: 1,
@@ -280,6 +282,7 @@ describe('orders endpoints', () => {
           completed: 3,
           cancelled: 0,
         },
+        paymentBreakdownPaise: { cash: 150000, upi: 100000, card: 0, online: 0 },
       });
 
       const res = await app.inject({
@@ -335,6 +338,40 @@ describe('orders endpoints', () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.json().order.status).toBe('preparing');
+    });
+
+    it('records the payment method when completing (ready → completed)', async () => {
+      ordersRepo.findByIdAndCafe.mockResolvedValueOnce(makeOrderWithItems({ status: 'ready' }));
+      ordersRepo.updateStatus.mockResolvedValueOnce(
+        makeOrder({ status: 'completed', paymentMethod: 'upi' }),
+      );
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/status`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { status: 'completed', paymentMethod: 'upi' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().order.paymentMethod).toBe('upi');
+      expect(ordersRepo.updateStatus).toHaveBeenCalledWith(
+        ORDER_ID,
+        CAFE_ID,
+        'completed',
+        'upi',
+      );
+    });
+
+    it('rejects an invalid payment method', async () => {
+      ordersRepo.findByIdAndCafe.mockResolvedValueOnce(makeOrderWithItems({ status: 'ready' }));
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/status`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { status: 'completed', paymentMethod: 'bitcoin' },
+      });
+      expect(res.statusCode).toBe(400);
     });
 
     it('rejects pending → completed (must go through preparing/ready)', async () => {

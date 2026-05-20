@@ -9,7 +9,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, ArrowRight, ChevronRight } from 'lucide-react';
 import { buttonClasses } from '@/components/ui/button';
-import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardBody,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { FadeIn, Stagger, StaggerItem } from '@/components/ui/motion';
 import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/api-server';
@@ -122,6 +128,50 @@ export default async function CafeDashboardPage({ params }: PageProps) {
           subtitle="Awaiting confirmation"
         />
       </Stagger>
+
+      {/* End-of-day reconciliation (Z-report) */}
+      <FadeIn delay={0.08}>
+        <Card>
+          <CardHeader>
+            <CardTitle>Today&apos;s reconciliation</CardTitle>
+            <CardDescription>
+              Daily cash-up across payment methods
+            </CardDescription>
+          </CardHeader>
+          <CardBody>
+            <dl className="space-y-2.5">
+              <ReconRow
+                label="Cash"
+                paise={stats.paymentBreakdownPaise.cash}
+              />
+              <ReconRow label="UPI" paise={stats.paymentBreakdownPaise.upi} />
+              <ReconRow
+                label="Card"
+                paise={stats.paymentBreakdownPaise.card}
+              />
+              {stats.paymentBreakdownPaise.online > 0 ? (
+                <ReconRow
+                  label="Online"
+                  paise={stats.paymentBreakdownPaise.online}
+                />
+              ) : null}
+
+              <div className="my-1 border-t border-border" />
+
+              <ReconRow
+                label="GST collected"
+                paise={stats.todayGstPaise}
+                muted
+              />
+              <ReconRow
+                label="Total collected"
+                paise={stats.todayRevenuePaise}
+                emphasis
+              />
+            </dl>
+          </CardBody>
+        </Card>
+      </FadeIn>
 
       {/* Action shortcuts */}
       <FadeIn delay={0.1}>
@@ -272,6 +322,43 @@ function OrderRow({ cafeId, order }: { cafeId: string; order: Order }) {
   );
 }
 
+function ReconRow({
+  label,
+  paise,
+  emphasis,
+  muted,
+}: {
+  label: string;
+  paise: number;
+  emphasis?: boolean;
+  muted?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <dt
+        className={cn(
+          'text-sm',
+          emphasis ? 'font-medium text-fg' : muted ? 'text-muted' : 'text-fg',
+        )}
+      >
+        {label}
+      </dt>
+      <dd
+        className={cn(
+          'tabular-nums',
+          emphasis
+            ? 'text-base font-semibold'
+            : muted
+              ? 'text-sm text-muted'
+              : 'text-sm font-medium',
+        )}
+      >
+        {formatRupeesExact(paise)}
+      </dd>
+    </div>
+  );
+}
+
 function StatusBadge({ status }: { status: OrderStatus }) {
   return (
     <span
@@ -312,6 +399,11 @@ const RUPEE_FORMATTER = new Intl.NumberFormat('en-IN', {
 function formatRupees(paise: number): string {
   const rupees = Math.round(paise / 100);
   return `₹${RUPEE_FORMATTER.format(rupees)}`;
+}
+
+// Reconciliation needs exact rupees (incl. paise) so GST + lines reconcile to total.
+function formatRupeesExact(paise: number): string {
+  return `₹${(paise / 100).toLocaleString('en-IN')}`;
 }
 
 function formatTime(iso: string): string {

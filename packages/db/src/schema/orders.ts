@@ -25,6 +25,9 @@ export type OrderStatus = (typeof orderStatusValues)[number];
 export const orderSourceValues = ['counter', 'qr', 'phone'] as const;
 export type OrderSource = (typeof orderSourceValues)[number];
 
+export const paymentMethodValues = ['cash', 'upi', 'card', 'online'] as const;
+export type PaymentMethod = (typeof paymentMethodValues)[number];
+
 export const orders = pgTable(
   'orders',
   {
@@ -47,6 +50,9 @@ export const orders = pgTable(
     // GST rate stored in basis points (500 = 5.00%, 1800 = 18.00%) so we
     // never lose precision if rates change in future.
     gstRateBp: integer().notNull().default(500),
+
+    // How the bill was settled — recorded when the order is completed.
+    paymentMethod: text({ enum: paymentMethodValues }),
 
     createdAt: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true, mode: 'string' })

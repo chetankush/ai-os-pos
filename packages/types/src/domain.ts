@@ -72,6 +72,8 @@ export type OrderStatus =
 
 export type OrderSource = 'counter' | 'qr' | 'phone';
 
+export type PaymentMethod = 'cash' | 'upi' | 'card' | 'online';
+
 export interface OrderItem {
   id: OrderItemId;
   orderId: OrderId;
@@ -97,6 +99,7 @@ export interface Order {
   taxPaise: number;
   totalPaise: number;
   gstRateBp: number;
+  paymentMethod: PaymentMethod | null;
   createdAt: string;
   updatedAt: string;
   paidAt: string | null;

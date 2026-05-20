@@ -86,6 +86,8 @@ const MENU: { category: string; items: SeedItem[] }[] = [
 
 type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
 
+type PaymentMethod = 'cash' | 'upi' | 'card' | 'online';
+
 interface SeedOrder {
   status: OrderStatus;
   source: 'counter' | 'qr' | 'phone';
@@ -94,14 +96,15 @@ interface SeedOrder {
   customerName?: string;
   customerPhone?: string;
   notes?: string;
+  paymentMethod?: PaymentMethod;
   lines: { name: string; qty: number }[];
 }
 
 const ORDERS: SeedOrder[] = [
-  { status: 'completed', source: 'counter', minutesAgo: 320, tableLabel: 'T5', lines: [{ name: 'Masala Chai', qty: 2 }, { name: 'Veg Maggi', qty: 1 }, { name: 'Samosa (2 pc)', qty: 1 }] },
-  { status: 'completed', source: 'qr', minutesAgo: 240, customerName: 'Rahul Verma', customerPhone: '9810012345', lines: [{ name: 'Cappuccino', qty: 1 }, { name: 'Chicken Tikka Sandwich', qty: 1 }] },
-  { status: 'completed', source: 'counter', minutesAgo: 150, tableLabel: 'T2', lines: [{ name: 'Veg Thali', qty: 2 }, { name: 'Gulab Jamun (2 pc)', qty: 1 }] },
-  { status: 'completed', source: 'qr', minutesAgo: 95, customerName: 'Sneha Gupta', customerPhone: '9999088776', lines: [{ name: 'Cold Coffee', qty: 2 }, { name: 'Brownie with Ice Cream', qty: 1 }] },
+  { status: 'completed', source: 'counter', minutesAgo: 320, tableLabel: 'T5', paymentMethod: 'cash', lines: [{ name: 'Masala Chai', qty: 2 }, { name: 'Veg Maggi', qty: 1 }, { name: 'Samosa (2 pc)', qty: 1 }] },
+  { status: 'completed', source: 'qr', minutesAgo: 240, customerName: 'Rahul Verma', customerPhone: '9810012345', paymentMethod: 'upi', lines: [{ name: 'Cappuccino', qty: 1 }, { name: 'Chicken Tikka Sandwich', qty: 1 }] },
+  { status: 'completed', source: 'counter', minutesAgo: 150, tableLabel: 'T2', paymentMethod: 'card', lines: [{ name: 'Veg Thali', qty: 2 }, { name: 'Gulab Jamun (2 pc)', qty: 1 }] },
+  { status: 'completed', source: 'qr', minutesAgo: 95, customerName: 'Sneha Gupta', customerPhone: '9999088776', paymentMethod: 'upi', lines: [{ name: 'Cold Coffee', qty: 2 }, { name: 'Brownie with Ice Cream', qty: 1 }] },
   { status: 'ready', source: 'counter', minutesAgo: 18, tableLabel: 'T7', lines: [{ name: 'Paneer Tikka', qty: 1 }, { name: 'Masala French Fries', qty: 1 }, { name: 'Cold Coffee', qty: 2 }] },
   { status: 'preparing', source: 'counter', minutesAgo: 9, tableLabel: 'T3', notes: 'Less spicy', lines: [{ name: 'Butter Chicken + 2 Roti', qty: 1 }, { name: 'Dal Makhani + Jeera Rice', qty: 1 }] },
   { status: 'preparing', source: 'qr', minutesAgo: 6, customerName: 'Priya Singh', lines: [{ name: 'Cappuccino', qty: 2 }, { name: 'Chocolate Brownie', qty: 1 }] },
@@ -210,6 +213,7 @@ async function main(): Promise<void> {
         taxPaise: tax,
         totalPaise: total,
         gstRateBp: GST_RATE_BP,
+        paymentMethod: o.status === 'completed' ? (o.paymentMethod ?? 'cash') : null,
         createdAt,
         updatedAt: createdAt,
         paidAt: o.status === 'completed' ? createdAt : null,

@@ -1,4 +1,9 @@
-import type { OrderItem, OrderResponse, OrderStatus } from '@sangam/types';
+import type {
+  CafeResponse,
+  OrderItem,
+  OrderResponse,
+  OrderStatus,
+} from '@sangam/types';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -8,6 +13,7 @@ import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/api-server';
 import { cn } from '@/lib/cn';
 import { OrderActions } from './order-actions';
+import { PrintViews } from './print-views';
 
 export const metadata = { title: 'Order · Sangam' };
 
@@ -25,14 +31,19 @@ export default async function OrderDetailPage({ params }: PageProps) {
   const { id, orderId } = await params;
 
   let data: OrderResponse;
+  let cafeData: CafeResponse;
   try {
-    data = await serverFetch<OrderResponse>(`/cafes/${id}/orders/${orderId}`);
+    [data, cafeData] = await Promise.all([
+      serverFetch<OrderResponse>(`/cafes/${id}/orders/${orderId}`),
+      serverFetch<CafeResponse>(`/cafes/${id}`),
+    ]);
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) notFound();
     throw err;
   }
 
   const order = data.order;
+  const cafe = cafeData.cafe;
   const sourceLabel = SOURCE_LABEL[order.source] ?? order.source;
   const customerLabel = order.customerName?.trim() || 'Walk-in';
   const gstRatePct = (order.gstRateBp / 100).toFixed(order.gstRateBp % 100 === 0 ? 0 : 2);
@@ -68,7 +79,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
               {formatRelative(order.createdAt)} · {sourceLabel} · {customerLabel}
             </p>
           </div>
-          <StatusPill status={order.status} />
+          <div className="flex flex-col items-end gap-3">
+            <StatusPill status={order.status} />
+            <PrintViews order={order} cafe={cafe} />
+          </div>
         </div>
       </FadeIn>
 

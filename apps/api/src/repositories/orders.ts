@@ -5,6 +5,7 @@ import type {
   OrderStatus,
   OrderStatsResponse,
   OrderWithItems,
+  PaymentMethod,
 } from '@sangam/types';
 import { and, count, desc, eq, gte, sql, sum } from 'drizzle-orm';
 
@@ -39,6 +40,7 @@ export interface OrdersRepository {
     id: string,
     cafeId: string,
     status: OrderStatus,
+    paymentMethod?: PaymentMethod,
   ): Promise<Order | null>;
   todayStats(cafeId: string): Promise<OrderStatsResponse>;
 }
@@ -117,10 +119,15 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
       return { ...orderRow, items };
     },
 
-    async updateStatus(id, cafeId, status) {
-      const patch: { status: OrderStatus; paidAt?: string } = { status };
+    async updateStatus(id, cafeId, status, paymentMethod) {
+      const patch: {
+        status: OrderStatus;
+        paidAt?: string;
+        paymentMethod?: PaymentMethod;
+      } = { status };
       if (status === 'completed') {
         patch.paidAt = new Date().toISOString();
+        if (paymentMethod) patch.paymentMethod = paymentMethod;
       }
 
       const [row] = await db
@@ -136,25 +143,23 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
       todayStart.setHours(0, 0, 0, 0);
       const todayIso = todayStart.toISOString();
 
-      const [todayAgg, statusAgg] = await Promise.all([
+      const completedToday = and(
+        eq(schema.orders.cafeId, cafeId),
+        gte(schema.orders.createdAt, todayIso),
+        eq(schema.orders.status, 'completed'),
+      );
+
+      const [todayAgg, statusAgg, paymentAgg] = await Promise.all([
         db
           .select({
             count: count(),
             revenue: sum(schema.orders.totalPaise),
+            gst: sum(schema.orders.taxPaise),
           })
           .from(schema.orders)
-          .where(
-            and(
-              eq(schema.orders.cafeId, cafeId),
-              gte(schema.orders.createdAt, todayIso),
-              eq(schema.orders.status, 'completed'),
-            ),
-          ),
+          .where(completedToday),
         db
-          .select({
-            status: schema.orders.status,
-            count: count(),
-          })
+          .select({ status: schema.orders.status, count: count() })
           .from(schema.orders)
           .where(
             and(
@@ -163,6 +168,14 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
             ),
           )
           .groupBy(schema.orders.status),
+        db
+          .select({
+            method: schema.orders.paymentMethod,
+            total: sum(schema.orders.totalPaise),
+          })
+          .from(schema.orders)
+          .where(completedToday)
+          .groupBy(schema.orders.paymentMethod),
       ]);
 
       const byStatus: Record<OrderStatus, number> = {
@@ -176,10 +189,24 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
         byStatus[row.status as OrderStatus] = Number(row.count);
       }
 
+      const paymentBreakdownPaise: Record<PaymentMethod, number> = {
+        cash: 0,
+        upi: 0,
+        card: 0,
+        online: 0,
+      };
+      for (const row of paymentAgg) {
+        if (row.method) {
+          paymentBreakdownPaise[row.method as PaymentMethod] = Number(row.total ?? 0);
+        }
+      }
+
       return {
         todayCount: Number(todayAgg[0]?.count ?? 0),
         todayRevenuePaise: Number(todayAgg[0]?.revenue ?? 0),
+        todayGstPaise: Number(todayAgg[0]?.gst ?? 0),
         byStatus,
+        paymentBreakdownPaise,
       };
     },
   };

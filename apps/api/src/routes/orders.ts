@@ -45,6 +45,7 @@ const createOrderBodySchema = z.object({
 
 const updateStatusBodySchema = z.object({
   status: z.enum(['pending', 'preparing', 'ready', 'completed', 'cancelled']),
+  paymentMethod: z.enum(['cash', 'upi', 'card', 'online']).optional(),
 });
 
 function generateOrderNumber(): string {
@@ -254,7 +255,9 @@ export async function ordersRoutes(
           error: { code: 'NOT_FOUND', message: 'Cafe not found' },
         });
       }
-      const { status: nextStatus } = updateStatusBodySchema.parse(request.body);
+      const { status: nextStatus, paymentMethod } = updateStatusBodySchema.parse(
+        request.body,
+      );
 
       const current = await ordersRepo.findByIdAndCafe(orderId, cafeId);
       if (!current) {
@@ -273,7 +276,12 @@ export async function ordersRoutes(
         });
       }
 
-      const updated = await ordersRepo.updateStatus(orderId, cafeId, nextStatus);
+      const updated = await ordersRepo.updateStatus(
+        orderId,
+        cafeId,
+        nextStatus,
+        paymentMethod,
+      );
       if (!updated) {
         return reply.status(404).send({
           error: { code: 'NOT_FOUND', message: 'Order not found' },
