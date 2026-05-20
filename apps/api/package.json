@@ -18,6 +18,7 @@
     "@fastify/sensible": "^6.0.1",
     "@sangam/db": "workspace:*",
     "@sangam/types": "workspace:*",
+    "dotenv": "^16.4.7",
     "drizzle-orm": "^0.36.4",
     "fastify": "^5.1.0",
     "fastify-plugin": "^5.0.1",

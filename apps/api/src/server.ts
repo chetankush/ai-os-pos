@@ -1,3 +1,7 @@
+// Load apps/api/.env into process.env before anything reads it. dotenv is a
+// no-op when there's no .env file (e.g. production, where the platform injects
+// env) and never overrides vars already present, so this is safe everywhere.
+import 'dotenv/config';
 import { buildApp } from './app.js';
 import { loadEnv } from './config/env.js';
 
