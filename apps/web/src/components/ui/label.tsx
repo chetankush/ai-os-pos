@@ -31,7 +31,7 @@ export function Label({
 }: LabelHTMLAttributes<HTMLLabelElement>) {
   return (
     <label
-      className={cn('block text-xs font-medium text-fg tracking-wide', className)}
+      className={cn('block text-sm font-medium text-fg/90 tracking-wider', className)}
       {...rest}
     />
   );

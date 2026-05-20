@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, type HTMLMotionProps, type Transition } from 'framer-motion';
+import { motion, useReducedMotion, type HTMLMotionProps, type Transition } from 'framer-motion';
 import type { ReactNode } from 'react';
 
 const EASE: Transition['ease'] = [0.22, 1, 0.36, 1];
@@ -12,12 +12,15 @@ interface FadeInProps extends Omit<HTMLMotionProps<'div'>, 'children'> {
   children?: ReactNode;
 }
 
-export function FadeIn({ delay = 0, duration = 0.4, y = 8, children, ...rest }: FadeInProps) {
+export function FadeIn({ delay = 0, duration = 0.45, y = 8, children, ...rest }: FadeInProps) {
+  const reduce = useReducedMotion();
+  const yOffset = reduce ? 0 : y;
+  const dur = reduce ? 0 : duration;
   return (
     <motion.div
-      initial={{ opacity: 0, y }}
+      initial={{ opacity: 0, y: yOffset }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration, delay, ease: EASE }}
+      transition={{ duration: dur, delay, ease: EASE }}
       {...rest}
     >
       {children}
@@ -32,6 +35,7 @@ interface StaggerProps {
 }
 
 export function Stagger({ className, children, stagger = 0.04 }: StaggerProps) {
+  const reduce = useReducedMotion();
   return (
     <motion.div
       className={className}
@@ -39,7 +43,7 @@ export function Stagger({ className, children, stagger = 0.04 }: StaggerProps) {
       animate="visible"
       variants={{
         hidden: {},
-        visible: { transition: { staggerChildren: stagger } },
+        visible: { transition: { staggerChildren: reduce ? 0 : stagger } },
       }}
     >
       {children}
@@ -56,12 +60,15 @@ export function StaggerItem({
   children: ReactNode;
   y?: number;
 }) {
+  const reduce = useReducedMotion();
+  const yOffset = reduce ? 0 : y;
+  const dur = reduce ? 0 : 0.45;
   return (
     <motion.div
       className={className}
       variants={{
-        hidden: { opacity: 0, y },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: EASE } },
+        hidden: { opacity: 0, y: yOffset },
+        visible: { opacity: 1, y: 0, transition: { duration: dur, ease: EASE } },
       }}
     >
       {children}

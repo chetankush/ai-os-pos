@@ -57,3 +57,51 @@ export interface MenuItem {
 export interface MenuCategoryWithItems extends MenuCategory {
   items: MenuItem[];
 }
+
+// ─── Orders ───────────────────────────────────────────────────────────────────
+
+export type OrderId = string;
+export type OrderItemId = string;
+
+export type OrderStatus =
+  | 'pending'
+  | 'preparing'
+  | 'ready'
+  | 'completed'
+  | 'cancelled';
+
+export type OrderSource = 'counter' | 'qr' | 'phone';
+
+export interface OrderItem {
+  id: OrderItemId;
+  orderId: OrderId;
+  menuItemId: string | null;
+  itemNameSnapshot: string;
+  unitPricePaise: number;
+  quantity: number;
+  lineTotalPaise: number;
+  notes: string | null;
+}
+
+export interface Order {
+  id: OrderId;
+  cafeId: CafeId;
+  orderNumber: string;
+  status: OrderStatus;
+  source: OrderSource;
+  tableLabel: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  notes: string | null;
+  subtotalPaise: number;
+  taxPaise: number;
+  totalPaise: number;
+  gstRateBp: number;
+  createdAt: string;
+  updatedAt: string;
+  paidAt: string | null;
+}
+
+export interface OrderWithItems extends Order {
+  items: OrderItem[];
+}

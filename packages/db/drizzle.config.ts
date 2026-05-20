@@ -10,7 +10,7 @@ export default defineConfig({
   // Explicit list (not a glob) so drizzle-kit doesn't try to parse our
   // ESM-style index re-export file, which uses `.js` extensions that its
   // CJS loader can't resolve.
-  schema: ['./src/schema/cafes.ts', './src/schema/menu.ts'],
+  schema: ['./src/schema/cafes.ts', './src/schema/menu.ts', './src/schema/orders.ts'],
   out: './drizzle/migrations',
   dialect: 'postgresql',
   // snake_case at the DB layer is Postgres convention and matches the

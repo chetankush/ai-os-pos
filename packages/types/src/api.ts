@@ -7,6 +7,9 @@ import type {
   MenuCategory,
   MenuCategoryWithItems,
   MenuItem,
+  Order,
+  OrderStatus,
+  OrderWithItems,
 } from './domain.js';
 
 export interface ApiError {
@@ -95,4 +98,37 @@ export interface MenuCategoryResponse {
 
 export interface MenuItemResponse {
   item: MenuItem;
+}
+
+// ─── Orders ───────────────────────────────────────────────────────────────────
+
+export interface CreateOrderRequest {
+  source?: 'counter' | 'qr' | 'phone';
+  tableLabel?: string;
+  customerName?: string;
+  customerPhone?: string;
+  notes?: string;
+  items: Array<{
+    menuItemId: string;
+    quantity: number;
+    notes?: string;
+  }>;
+}
+
+export interface UpdateOrderStatusRequest {
+  status: OrderStatus;
+}
+
+export interface OrderResponse {
+  order: OrderWithItems;
+}
+
+export interface OrdersListResponse {
+  orders: Order[];
+}
+
+export interface OrderStatsResponse {
+  todayCount: number;
+  todayRevenuePaise: number;
+  byStatus: Record<OrderStatus, number>;
 }

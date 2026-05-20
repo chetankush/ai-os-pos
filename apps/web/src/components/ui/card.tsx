@@ -5,8 +5,9 @@ export function Card({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        'rounded-lg border border-border bg-bg',
-        'transition-colors duration-150',
+        'rounded-xl border border-border bg-bg',
+        'shadow-sm shadow-black/[0.03]',
+        'transition-all duration-150',
         className,
       )}
       {...rest}
@@ -42,7 +43,7 @@ export function CardFooter({ className, ...rest }: HTMLAttributes<HTMLDivElement
   return (
     <div
       className={cn(
-        'px-6 py-4 border-t border-border bg-subtle/30 rounded-b-lg',
+        'px-6 py-4 border-t border-border bg-subtle/30 rounded-b-xl',
         className,
       )}
       {...rest}
