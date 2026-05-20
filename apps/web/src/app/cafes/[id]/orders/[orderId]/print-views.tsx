@@ -184,8 +184,30 @@ function Bill({ order, cafe }: { order: OrderWithItems; cafe: Cafe }) {
       <Divider />
 
       <Row label="Subtotal" value={formatRupees(order.subtotalPaise)} />
-      <Row label={`CGST ${halfRatePct}%`} value={formatRupees(cgstPaise)} />
-      <Row label={`SGST ${halfRatePct}%`} value={formatRupees(sgstPaise)} />
+      {order.discountPaise > 0 && (
+        <Row
+          label={order.discountReason ? `Discount (${order.discountReason})` : 'Discount'}
+          value={`- ${formatRupees(order.discountPaise)}`}
+        />
+      )}
+      {order.serviceChargePaise > 0 && (
+        <Row label="Service charge" value={formatRupees(order.serviceChargePaise)} />
+      )}
+      {order.packagingChargePaise > 0 && (
+        <Row label="Packaging" value={formatRupees(order.packagingChargePaise)} />
+      )}
+      {order.taxPaise > 0 && (
+        <>
+          <Row label={`CGST ${halfRatePct}%`} value={formatRupees(cgstPaise)} />
+          <Row label={`SGST ${halfRatePct}%`} value={formatRupees(sgstPaise)} />
+        </>
+      )}
+      {order.roundOffPaise !== 0 && (
+        <Row
+          label="Round off"
+          value={`${order.roundOffPaise > 0 ? '+ ' : '- '}${formatRupees(Math.abs(order.roundOffPaise))}`}
+        />
+      )}
 
       <div className="mt-1 flex items-baseline justify-between border-t-2 border-black pt-1">
         <span className="text-sm font-bold">Total</span>

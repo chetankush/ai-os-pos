@@ -63,6 +63,55 @@ function formatRupees(paise: number): string {
   )}`;
 }
 
+interface BillBreakdown {
+  discountPaise: number;
+  serviceChargePaise: number;
+  packagingChargePaise: number;
+  taxPaise: number;
+  roundOffPaise: number;
+  totalPaise: number;
+}
+
+/**
+ * Mirrors the server's computeBillAdjustments (apps/api/src/orders/build.ts) so
+ * the cart total previews exactly what the server will charge. Keep in sync.
+ */
+function computeBill(
+  subtotalPaise: number,
+  gstRateBp: number,
+  opts: {
+    discount?: { type: 'percent' | 'flat'; valuePaiseOrPct: number };
+    serviceChargeBp?: number;
+    packagingChargePaise?: number;
+    roundOff?: boolean;
+  },
+): BillBreakdown {
+  const nn = (n: number) => (Number.isFinite(n) && n > 0 ? Math.round(n) : 0);
+  let discountPaise = 0;
+  if (opts.discount && opts.discount.valuePaiseOrPct > 0) {
+    discountPaise =
+      opts.discount.type === 'percent'
+        ? nn((subtotalPaise * Math.min(opts.discount.valuePaiseOrPct, 100)) / 100)
+        : nn(opts.discount.valuePaiseOrPct);
+    discountPaise = Math.min(discountPaise, subtotalPaise);
+  }
+  const netFood = subtotalPaise - discountPaise;
+  const serviceChargePaise = opts.serviceChargeBp ? nn((netFood * opts.serviceChargeBp) / 10000) : 0;
+  const packagingChargePaise = nn(opts.packagingChargePaise ?? 0);
+  const taxableBase = netFood + serviceChargePaise + packagingChargePaise;
+  const taxPaise = Math.round((taxableBase * gstRateBp) / 10000);
+  const preRound = taxableBase + taxPaise;
+  const roundOffPaise = opts.roundOff ? Math.round(preRound / 100) * 100 - preRound : 0;
+  return {
+    discountPaise,
+    serviceChargePaise,
+    packagingChargePaise,
+    taxPaise,
+    roundOffPaise,
+    totalPaise: preRound + roundOffPaise,
+  };
+}
+
 export function OrderBuilder({
   cafeId,
   cafe,
@@ -81,6 +130,13 @@ export function OrderBuilder({
   const [activeCat, setActiveCat] = useState<string>(ALL);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bill adjustments (counter flow). Discount value is %, or ₹ when type==='flat'.
+  const [discountType, setDiscountType] = useState<'percent' | 'flat'>('percent');
+  const [discountValue, setDiscountValue] = useState('');
+  const [discountReason, setDiscountReason] = useState('');
+  const [serviceChargePct, setServiceChargePct] = useState('');
+  const [packagingRupees, setPackagingRupees] = useState('');
+  const [roundOff, setRoundOff] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
   // ─── Cart mutations ──────────────────────────────────────────────────────────
@@ -134,8 +190,38 @@ export function OrderBuilder({
   // Composition dealers and exempt cafes charge no GST on the bill.
   const gstRateBp =
     cafe.gstMode === 'regular_18' ? 1800 : cafe.gstMode === 'regular_5' ? 500 : 0;
-  const taxPaise = Math.round((subtotalPaise * gstRateBp) / 10000);
-  const totalPaise = subtotalPaise + taxPaise;
+
+  // Bill adjustments → resolved paise (previews exactly what the server charges).
+  const discountInput = Number(discountValue) || 0;
+  const serviceChargeBp = Math.round((Number(serviceChargePct) || 0) * 100);
+  const packagingChargePaise = Math.round((Number(packagingRupees) || 0) * 100);
+  const bill = useMemo(
+    () =>
+      computeBill(subtotalPaise, gstRateBp, {
+        discount:
+          discountInput > 0
+            ? {
+                type: discountType,
+                valuePaiseOrPct:
+                  discountType === 'flat' ? Math.round(discountInput * 100) : discountInput,
+              }
+            : undefined,
+        serviceChargeBp: serviceChargeBp || undefined,
+        packagingChargePaise: packagingChargePaise || undefined,
+        roundOff,
+      }),
+    [
+      subtotalPaise,
+      gstRateBp,
+      discountType,
+      discountInput,
+      serviceChargeBp,
+      packagingChargePaise,
+      roundOff,
+    ],
+  );
+  const taxPaise = bill.taxPaise;
+  const totalPaise = bill.totalPaise;
 
   // Available categories that actually have available items.
   const liveCategories = useMemo(
@@ -182,6 +268,18 @@ export function OrderBuilder({
       ...(tableLabel.trim() ? { tableLabel: tableLabel.trim() } : {}),
       ...(notes.trim() ? { notes: notes.trim() } : {}),
       ...(sessionId ? { tableSessionId: sessionId } : {}),
+      ...(discountInput > 0
+        ? {
+            discount: {
+              type: discountType,
+              value: discountType === 'flat' ? Math.round(discountInput * 100) : discountInput,
+              ...(discountReason.trim() ? { reason: discountReason.trim() } : {}),
+            },
+          }
+        : {}),
+      ...(serviceChargeBp > 0 ? { serviceChargeBp } : {}),
+      ...(packagingChargePaise > 0 ? { packagingChargePaise } : {}),
+      ...(roundOff ? { roundOff: true } : {}),
     };
 
     setSubmitting(true);
@@ -213,6 +311,19 @@ export function OrderBuilder({
     taxPaise,
     totalPaise,
     gstRateBp,
+    bill,
+    discountType,
+    setDiscountType,
+    discountValue,
+    setDiscountValue,
+    discountReason,
+    setDiscountReason,
+    serviceChargePct,
+    setServiceChargePct,
+    packagingRupees,
+    setPackagingRupees,
+    roundOff,
+    setRoundOff,
     tableLabel,
     setTableLabel,
     customerName,
@@ -527,6 +638,19 @@ interface CartPanelProps {
   taxPaise: number;
   totalPaise: number;
   gstRateBp: number;
+  bill: BillBreakdown;
+  discountType: 'percent' | 'flat';
+  setDiscountType: (v: 'percent' | 'flat') => void;
+  discountValue: string;
+  setDiscountValue: (v: string) => void;
+  discountReason: string;
+  setDiscountReason: (v: string) => void;
+  serviceChargePct: string;
+  setServiceChargePct: (v: string) => void;
+  packagingRupees: string;
+  setPackagingRupees: (v: string) => void;
+  roundOff: boolean;
+  setRoundOff: (v: boolean) => void;
   tableLabel: string;
   setTableLabel: (v: string) => void;
   customerName: string;
@@ -552,6 +676,19 @@ function CartPanel(props: CartPanelProps) {
     taxPaise,
     totalPaise,
     gstRateBp,
+    bill,
+    discountType,
+    setDiscountType,
+    discountValue,
+    setDiscountValue,
+    discountReason,
+    setDiscountReason,
+    serviceChargePct,
+    setServiceChargePct,
+    packagingRupees,
+    setPackagingRupees,
+    roundOff,
+    setRoundOff,
     tableLabel,
     setTableLabel,
     customerName,
@@ -569,6 +706,7 @@ function CartPanel(props: CartPanelProps) {
     embedded,
   } = props;
   const [showDetails, setShowDetails] = useState(false);
+  const [showAdjust, setShowAdjust] = useState(false);
 
   const body = (
     <>
@@ -643,10 +781,26 @@ function CartPanel(props: CartPanelProps) {
       {/* Totals */}
       <div className="space-y-1.5 border-t border-border pt-3">
         <Row label="Subtotal" value={formatRupees(subtotalPaise)} muted />
+        {bill.discountPaise > 0 && (
+          <Row label="Discount" value={`− ${formatRupees(bill.discountPaise)}`} muted />
+        )}
+        {bill.serviceChargePaise > 0 && (
+          <Row label="Service charge" value={formatRupees(bill.serviceChargePaise)} muted />
+        )}
+        {bill.packagingChargePaise > 0 && (
+          <Row label="Packaging" value={formatRupees(bill.packagingChargePaise)} muted />
+        )}
         {gstRateBp > 0 && (
           <Row
             label={`GST (${(gstRateBp / 100).toFixed(0)}%)`}
             value={formatRupees(taxPaise)}
+            muted
+          />
+        )}
+        {bill.roundOffPaise !== 0 && (
+          <Row
+            label="Round off"
+            value={`${bill.roundOffPaise > 0 ? '+ ' : '− '}${formatRupees(Math.abs(bill.roundOffPaise))}`}
             muted
           />
         )}
@@ -657,6 +811,91 @@ function CartPanel(props: CartPanelProps) {
           </span>
         </div>
       </div>
+
+      {/* Discount & charges — collapsed by default to keep the flow fast */}
+      <button
+        type="button"
+        onClick={() => setShowAdjust((s) => !s)}
+        className="text-xs text-muted hover:text-fg transition-colors"
+      >
+        {showAdjust ? 'Hide' : 'Add'} discount / charges
+      </button>
+      {showAdjust && (
+        <div className="space-y-3 rounded-lg border border-border bg-subtle/30 p-3">
+          <div>
+            <div className="mb-1 flex items-center gap-2">
+              <span className="text-xs font-medium text-muted">Discount</span>
+              <div className="ml-auto inline-flex rounded-md border border-border bg-bg p-0.5">
+                {(['percent', 'flat'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    aria-pressed={discountType === t}
+                    onClick={() => setDiscountType(t)}
+                    className={cn(
+                      'rounded px-2 py-0.5 text-xs font-medium transition-colors',
+                      discountType === t ? 'bg-accent/10 text-accent' : 'text-muted hover:text-fg',
+                    )}
+                  >
+                    {t === 'percent' ? '%' : '₹'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                value={discountValue}
+                onChange={(e) => setDiscountValue(e.target.value)}
+                placeholder={discountType === 'percent' ? '10' : '50'}
+                aria-label="Discount amount"
+              />
+              <Input
+                value={discountReason}
+                onChange={(e) => setDiscountReason(e.target.value)}
+                placeholder="Reason"
+                maxLength={120}
+                aria-label="Discount reason"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Service charge %" htmlFor="o-sc">
+              <Input
+                id="o-sc"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                value={serviceChargePct}
+                onChange={(e) => setServiceChargePct(e.target.value)}
+                placeholder="0"
+              />
+            </Field>
+            <Field label="Packaging ₹" htmlFor="o-pkg">
+              <Input
+                id="o-pkg"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                value={packagingRupees}
+                onChange={(e) => setPackagingRupees(e.target.value)}
+                placeholder="0"
+              />
+            </Field>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={roundOff}
+              onChange={(e) => setRoundOff(e.target.checked)}
+              className="size-4 accent-accent"
+            />
+            Round off to nearest ₹
+          </label>
+        </div>
+      )}
 
       {/* Optional details — collapsed by default to keep the flow fast */}
       <button

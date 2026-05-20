@@ -158,10 +158,30 @@ export default async function OrderDetailPage({ params }: PageProps) {
               </CardHeader>
               <CardBody className="pt-0 space-y-3">
                 <SummaryRow label="Subtotal" value={formatRupees(order.subtotalPaise)} />
-                <SummaryRow
-                  label={`Tax (GST ${gstRatePct}%)`}
-                  value={formatRupees(order.taxPaise)}
-                />
+                {order.discountPaise > 0 && (
+                  <SummaryRow
+                    label={order.discountReason ? `Discount (${order.discountReason})` : 'Discount'}
+                    value={`− ${formatRupees(order.discountPaise)}`}
+                  />
+                )}
+                {order.serviceChargePaise > 0 && (
+                  <SummaryRow label="Service charge" value={formatRupees(order.serviceChargePaise)} />
+                )}
+                {order.packagingChargePaise > 0 && (
+                  <SummaryRow label="Packaging" value={formatRupees(order.packagingChargePaise)} />
+                )}
+                {order.taxPaise > 0 && (
+                  <SummaryRow
+                    label={`Tax (GST ${gstRatePct}%)`}
+                    value={formatRupees(order.taxPaise)}
+                  />
+                )}
+                {order.roundOffPaise !== 0 && (
+                  <SummaryRow
+                    label="Round off"
+                    value={`${order.roundOffPaise > 0 ? '+ ' : '− '}${formatRupees(Math.abs(order.roundOffPaise))}`}
+                  />
+                )}
                 <div className="border-t-2 border-border-strong pt-3 flex items-baseline justify-between">
                   <span className="text-sm font-semibold">Total</span>
                   <span className="text-2xl font-semibold tabular-nums">
