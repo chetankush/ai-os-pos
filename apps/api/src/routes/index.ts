@@ -1,7 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { aiConsoleRoutes } from './ai-console.js';
 import { aiRoutes } from './ai.js';
+import { auditLogsRoutes } from './audit-logs.js';
 import { cafesRoutes } from './cafes.js';
+import { cashDrawerRoutes } from './cash-drawer.js';
 import { healthRoutes } from './health.js';
 import { menuRoutes } from './menu.js';
 import { ordersRoutes } from './orders.js';
@@ -9,6 +11,7 @@ import { paymentsRoutes } from './payments.js';
 import { reportsRoutes } from './reports.js';
 import { publicRoutes } from './public.js';
 import { settleRoutes } from './settle.js';
+import { staffRoutes } from './staff.js';
 import { tableSessionsRoutes } from './table-sessions.js';
 import { tablesRoutes } from './tables.js';
 import { uploadsRoutes } from './uploads.js';
@@ -27,6 +30,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     await app.register(reportsRoutes);
     await app.register(tablesRoutes);
     await app.register(tableSessionsRoutes);
+    await app.register(staffRoutes);
+    await app.register(auditLogsRoutes);
+    await app.register(cashDrawerRoutes);
     await app.register(aiRoutes);
     await app.register(aiConsoleRoutes);
   } else {
