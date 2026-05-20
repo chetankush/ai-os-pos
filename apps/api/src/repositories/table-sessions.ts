@@ -3,12 +3,15 @@ import type {
   OrderWithItems,
   PaymentMethod,
   RestaurantTable,
+  TableHistory,
+  TableHistorySession,
+  TableHistoryTableSummary,
   TableLiveStatus,
   TableSession,
   TableSessionDetail,
   TableWithStatus,
 } from '@sangam/types';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 
 export interface NewTableSession {
   cafeId: string;
@@ -25,6 +28,11 @@ export interface TableSessionsRepository {
   getDetail(id: string, cafeId: string): Promise<TableSessionDetail | null>;
   /** Every table for the cafe with its open session + derived live status. */
   floor(cafeId: string): Promise<TableWithStatus[]>;
+  /**
+   * Settled-session history: closed sessions that had at least one paid order,
+   * each rolled up to its items + totals, plus a per-table billed-total summary.
+   */
+  history(cafeId: string): Promise<TableHistory>;
   /**
    * Settle the whole tab in a transaction: mark every order completed + paid,
    * then close the session. Returns the post-settle detail (null if missing).
@@ -217,6 +225,121 @@ export function createDrizzleTableSessionsRepo(db: Database): TableSessionsRepos
           runningTotalPaise,
         };
       });
+    },
+
+    async history(cafeId) {
+      // Closed sessions for the cafe, with their table, newest-settled first.
+      const sessionRows = await db
+        .select({ session: schema.tableSessions, table: schema.restaurantTables })
+        .from(schema.tableSessions)
+        .innerJoin(
+          schema.restaurantTables,
+          eq(schema.tableSessions.tableId, schema.restaurantTables.id),
+        )
+        .where(
+          and(eq(schema.tableSessions.cafeId, cafeId), eq(schema.tableSessions.status, 'closed')),
+        )
+        .orderBy(desc(schema.tableSessions.closedAt));
+      if (sessionRows.length === 0) return { tables: [], sessions: [] };
+
+      // Only paid orders count as "settled" — abandoned/closed-without-payment
+      // sessions have no paid orders and are filtered out below.
+      const sessionIds = sessionRows.map((r) => r.session.id);
+      const orderRows = await db
+        .select()
+        .from(schema.orders)
+        .where(
+          and(
+            eq(schema.orders.cafeId, cafeId),
+            inArray(schema.orders.tableSessionId, sessionIds),
+            eq(schema.orders.paymentStatus, 'paid'),
+          ),
+        );
+
+      const orderIds = orderRows.map((o) => o.id);
+      const itemRows =
+        orderIds.length > 0
+          ? await db
+              .select()
+              .from(schema.orderItems)
+              .where(inArray(schema.orderItems.orderId, orderIds))
+          : [];
+
+      const itemsByOrder = new Map<string, typeof itemRows>();
+      for (const item of itemRows) {
+        const list = itemsByOrder.get(item.orderId) ?? [];
+        list.push(item);
+        itemsByOrder.set(item.orderId, list);
+      }
+
+      const ordersBySession = new Map<string, typeof orderRows>();
+      for (const o of orderRows) {
+        if (!o.tableSessionId) continue;
+        const list = ordersBySession.get(o.tableSessionId) ?? [];
+        list.push(o);
+        ordersBySession.set(o.tableSessionId, list);
+      }
+
+      const sessions: TableHistorySession[] = [];
+      for (const { session, table } of sessionRows) {
+        const orders = ordersBySession.get(session.id) ?? [];
+        if (orders.length === 0) continue; // settled-only
+
+        const itemQty = new Map<string, number>();
+        const methods = new Set<PaymentMethod>();
+        let subtotalPaise = 0;
+        let taxPaise = 0;
+        let totalPaise = 0;
+        for (const o of orders) {
+          subtotalPaise += o.subtotalPaise;
+          taxPaise += o.taxPaise;
+          totalPaise += o.totalPaise;
+          if (o.paymentMethod) methods.add(o.paymentMethod);
+          for (const item of itemsByOrder.get(o.id) ?? []) {
+            itemQty.set(
+              item.itemNameSnapshot,
+              (itemQty.get(item.itemNameSnapshot) ?? 0) + item.quantity,
+            );
+          }
+        }
+
+        sessions.push({
+          id: session.id,
+          tableId: session.tableId,
+          tableLabel: table.label,
+          area: table.area,
+          guestName: session.guestName,
+          guestPhone: session.guestPhone,
+          partySize: session.partySize,
+          openedAt: session.openedAt,
+          closedAt: session.closedAt,
+          orderCount: orders.length,
+          subtotalPaise,
+          taxPaise,
+          totalPaise,
+          paymentMethods: Array.from(methods),
+          items: Array.from(itemQty, ([name, quantity]) => ({ name, quantity })),
+        });
+      }
+
+      const byTable = new Map<string, TableHistoryTableSummary>();
+      for (const s of sessions) {
+        const cur = byTable.get(s.tableId) ?? {
+          tableId: s.tableId,
+          label: s.tableLabel,
+          area: s.area,
+          sessionCount: 0,
+          totalBilledPaise: 0,
+        };
+        cur.sessionCount += 1;
+        cur.totalBilledPaise += s.totalPaise;
+        byTable.set(s.tableId, cur);
+      }
+      const tables = Array.from(byTable.values()).sort(
+        (a, b) => b.totalBilledPaise - a.totalBilledPaise,
+      );
+
+      return { tables, sessions };
     },
 
     async settle(id, cafeId, paymentMethod) {

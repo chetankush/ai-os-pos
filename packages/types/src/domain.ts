@@ -170,6 +170,47 @@ export interface TableSessionDetail {
   totalPaise: number;
 }
 
+/** An ordered item rolled up across a session (name + total quantity). */
+export interface TableHistoryItem {
+  name: string;
+  quantity: number;
+}
+
+/** A past (settled) session — what a table ordered and what it was billed. */
+export interface TableHistorySession {
+  id: string;
+  tableId: TableId;
+  tableLabel: string;
+  area: string | null;
+  guestName: string | null;
+  guestPhone: string | null;
+  partySize: number | null;
+  openedAt: string;
+  closedAt: string | null;
+  orderCount: number;
+  subtotalPaise: number;
+  taxPaise: number;
+  totalPaise: number;
+  /** Distinct payment methods used to settle this session's orders. */
+  paymentMethods: PaymentMethod[];
+  items: TableHistoryItem[];
+}
+
+/** Per-table rollup across all its settled sessions. */
+export interface TableHistoryTableSummary {
+  tableId: TableId;
+  label: string;
+  area: string | null;
+  sessionCount: number;
+  totalBilledPaise: number;
+}
+
+/** Settled-session history: per-table totals + the session drill-down list. */
+export interface TableHistory {
+  tables: TableHistoryTableSummary[];
+  sessions: TableHistorySession[];
+}
+
 // ─── Settle (aggregator reconciliation + dispute recovery) ──────────────────────
 
 export type SettlePlatform = 'zomato' | 'swiggy';

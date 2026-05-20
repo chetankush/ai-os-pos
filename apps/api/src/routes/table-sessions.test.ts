@@ -2,6 +2,7 @@ import type {
   Cafe,
   OrderWithItems,
   RestaurantTable,
+  TableHistory,
   TableSession,
   TableSessionDetail,
   TableWithStatus,
@@ -123,6 +124,7 @@ function createMockSessionsRepo() {
     findByIdAndCafe: vi.fn<(id: string, cafeId: string) => Promise<TableSession | null>>(),
     getDetail: vi.fn<(id: string, cafeId: string) => Promise<TableSessionDetail | null>>(),
     floor: vi.fn<(cafeId: string) => Promise<TableWithStatus[]>>(),
+    history: vi.fn<(cafeId: string) => Promise<TableHistory>>(),
     settle:
       vi.fn<
         (
@@ -187,6 +189,7 @@ describe('table-sessions endpoints', () => {
     sessionsRepo.findByIdAndCafe.mockReset();
     sessionsRepo.getDetail.mockReset();
     sessionsRepo.floor.mockReset();
+    sessionsRepo.history.mockReset();
     sessionsRepo.settle.mockReset();
     sessionsRepo.close.mockReset();
     tablesRepo.findByIdAndCafe.mockReset();
@@ -212,6 +215,60 @@ describe('table-sessions endpoints', () => {
       expect(res.json().tables).toHaveLength(1);
       expect(res.json().tables[0].liveStatus).toBe('occupied');
       expect(res.json().tables[0].runningTotalPaise).toBe(31500);
+    });
+  });
+
+  describe('GET /cafes/:cafeId/table-sessions/history', () => {
+    it('returns per-table totals and the settled-session drill-down', async () => {
+      const history: TableHistory = {
+        tables: [
+          {
+            tableId: TABLE_ID,
+            label: 'T1',
+            area: 'Main Hall',
+            sessionCount: 2,
+            totalBilledPaise: 63000,
+          },
+        ],
+        sessions: [
+          {
+            id: SESSION_ID,
+            tableId: TABLE_ID,
+            tableLabel: 'T1',
+            area: 'Main Hall',
+            guestName: 'Asha',
+            guestPhone: null,
+            partySize: 2,
+            openedAt: '2026-05-20T00:00:00.000Z',
+            closedAt: '2026-05-20T01:00:00.000Z',
+            orderCount: 1,
+            subtotalPaise: 30000,
+            taxPaise: 1500,
+            totalPaise: 31500,
+            paymentMethods: ['upi'],
+            items: [{ name: 'Masala Chai', quantity: 2 }],
+          },
+        ],
+      };
+      sessionsRepo.history.mockResolvedValueOnce(history);
+      const res = await app.inject({
+        method: 'GET',
+        url: `/cafes/${CAFE_ID}/table-sessions/history`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(sessionsRepo.history).toHaveBeenCalledWith(CAFE_ID);
+      expect(res.json().tables[0].totalBilledPaise).toBe(63000);
+      expect(res.json().sessions[0].items[0]).toEqual({ name: 'Masala Chai', quantity: 2 });
+    });
+
+    it('requires authentication', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: `/cafes/${CAFE_ID}/table-sessions/history`,
+      });
+      expect(res.statusCode).toBe(401);
+      expect(sessionsRepo.history).not.toHaveBeenCalled();
     });
   });
 

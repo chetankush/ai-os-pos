@@ -57,6 +57,20 @@ export async function tableSessionsRoutes(
     return { tables };
   });
 
+  // ─── GET /cafes/:cafeId/table-sessions/history ──────────────────────────────
+  // Static "history" segment is matched before the parametric ":sessionId" route.
+  app.get(
+    '/cafes/:cafeId/table-sessions/history',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { cafeId } = cafeParamsSchema.parse(request.params);
+      if (!(await ownsCafe(cafeId, request.user.id))) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Cafe not found' } });
+      }
+      return sessionsRepo.history(cafeId);
+    },
+  );
+
   // ─── POST /cafes/:cafeId/table-sessions ─────────────────────────────────────
   app.post(
     '/cafes/:cafeId/table-sessions',

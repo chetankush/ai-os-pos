@@ -5,7 +5,7 @@ import { ArrowLeft, LayoutGrid } from 'lucide-react';
 import { buttonClasses } from '@/components/ui/button';
 import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/api-server';
-import { FloorView } from './floor-view';
+import { TablesTabs } from './tables-tabs';
 
 export const metadata = { title: 'Tables · Sangam' };
 
@@ -59,7 +59,7 @@ export default async function TablesPage({ params }: PageProps) {
         </div>
       </div>
 
-      <FloorView cafeId={cafe.id} initialFloor={floorRes} />
+      <TablesTabs cafeId={cafe.id} initialFloor={floorRes} />
     </div>
   );
 }

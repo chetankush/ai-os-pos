@@ -13,6 +13,7 @@ import type {
   PaymentMethod,
   PaymentStatus,
   RestaurantTable,
+  TableHistory,
   TableSession,
   TableSessionDetail,
   TableShape,
@@ -289,6 +290,9 @@ export interface TableSessionDetailResponse {
 export interface SettleSessionRequest {
   paymentMethod: PaymentMethod;
 }
+
+/** Settled-session history for a cafe — per-table totals + session drill-down. */
+export type TableHistoryResponse = TableHistory;
 
 // ─── Settle ─────────────────────────────────────────────────────────────────
 
