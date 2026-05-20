@@ -4,10 +4,13 @@ import { cn } from '@/lib/cn';
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
+// P1 focus-states: 2px ring + offset against the page bg, consistent with Input.
+// P7 reduced-motion: globals.css collapses transition/transform durations; active:scale
+// degrades to a no-op so the press feedback never causes motion sickness.
 const base =
   'inline-flex items-center justify-center gap-2 rounded-lg font-medium ' +
   'transition-all duration-150 ease-out outline-none whitespace-nowrap ' +
-  'focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-fg ' +
+  'focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-bg focus-visible:ring-fg ' +
   'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none ' +
   'active:scale-[0.98] select-none touch-manipulation';
 
@@ -48,6 +51,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={buttonClasses({ variant, size, className })}
       {...rest}
     >

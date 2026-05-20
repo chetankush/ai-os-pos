@@ -48,7 +48,8 @@ export async function settleRoutes(app: FastifyInstance): Promise<void> {
         body.netPayoutRupees != null ? toPaise(body.netPayoutRupees) : undefined,
     };
 
-    const report = analyzeStatement(statement, body.config ?? {});
+    // analyzeStatement defaults missing config to {}, so passing undefined is fine.
+    const report = analyzeStatement(statement, body.config);
     return { report };
   });
 }

@@ -2,6 +2,7 @@ import type {
   SettleCategory,
   SettleConfig,
   SettleFinding,
+  SettleFindingCode,
   SettlePlatform,
   SettleReport,
   SettleStatement,
@@ -10,6 +11,7 @@ import type {
 const COMMISSION_TOLERANCE_PP = 0.5; // percentage points
 const HIGH_TAKE_RATE_PCT = 35;
 const TAX_DEVIATION_THRESHOLD = 0.25; // 25%
+const EXPECTED_TAX_RATE = 0.01; // TCS/TDS run ~1% of the platform service fee.
 
 // Deductions that are contractual / statutory and not realistically recoverable.
 const MANDATORY_CATEGORIES: ReadonlySet<SettleCategory> = new Set<SettleCategory>([
@@ -37,10 +39,20 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-function sumCategory(stmt: SettleStatement, category: SettleCategory): number {
+function sumCategories(stmt: SettleStatement, ...categories: SettleCategory[]): number {
+  const wanted = new Set(categories);
   return stmt.deductions
-    .filter((d) => d.category === category)
+    .filter((d) => wanted.has(d.category))
     .reduce((acc, d) => acc + d.amountPaise, 0);
+}
+
+/** Derived monetary totals shared by the report body and the WhatsApp summary. */
+interface SettleTotals {
+  totalDeductionsPaise: number;
+  netPayoutPaise: number;
+  effectiveTakeRatePct: number;
+  mandatoryDeductionsPaise: number;
+  disputablePaise: number;
 }
 
 export function analyzeStatement(
@@ -62,7 +74,7 @@ export function analyzeStatement(
 
   // 1. Unauthorized ads — the highest-leverage dispute (Swiggy reverses when
   //    there is no consent trail; MediaNama Apr 2026).
-  const ads = sumCategory(stmt, 'ads');
+  const ads = sumCategories(stmt, 'ads');
   if (ads > 0 && config.adsConsented !== true) {
     findings.push({
       code: 'UNAUTHORIZED_ADS',
@@ -78,7 +90,7 @@ export function analyzeStatement(
   }
 
   // 2. Commission charged above the contracted rate.
-  const commission = sumCategory(stmt, 'commission');
+  const commission = sumCategories(stmt, 'commission');
   if (
     config.contractedCommissionRatePct != null &&
     stmt.grossSalesPaise > 0 &&
@@ -104,7 +116,7 @@ export function analyzeStatement(
   }
 
   // 3. Restaurant-funded discounts the owner may not have approved.
-  const discount = sumCategory(stmt, 'discount');
+  const discount = sumCategories(stmt, 'discount');
   if (discount > 0 && config.discountsApproved !== true) {
     findings.push({
       code: 'DISCOUNT_REVIEW',
@@ -119,7 +131,7 @@ export function analyzeStatement(
   }
 
   // 4. Refund / compensation deductions (customer-fault refunds shouldn't hit you).
-  const refund = sumCategory(stmt, 'refund') + sumCategory(stmt, 'cancellation');
+  const refund = sumCategories(stmt, 'refund', 'cancellation');
   if (refund > 0) {
     findings.push({
       code: 'REFUND_DEDUCTION',
@@ -149,28 +161,28 @@ export function analyzeStatement(
   }
 
   // 6. TCS / TDS sanity (should be ~1% of platform service fee). Informational.
-  const serviceFeeBase = commission + sumCategory(stmt, 'service_fee');
-  if (serviceFeeBase > 0) {
-    const expectedTax = Math.round(serviceFeeBase * 0.01);
-    for (const [cat, code] of [
+  const serviceFeeBase = commission + sumCategories(stmt, 'service_fee');
+  const expectedTax = Math.round(serviceFeeBase * EXPECTED_TAX_RATE);
+  if (expectedTax > 0) {
+    const taxRules: ReadonlyArray<[SettleCategory, SettleFindingCode]> = [
       ['tcs', 'TCS_MISMATCH'],
       ['tds', 'TDS_MISMATCH'],
-    ] as const) {
-      const actual = sumCategory(stmt, cat);
-      if (actual > 0 && expectedTax > 0) {
-        const deviation = Math.abs(actual - expectedTax) / expectedTax;
-        if (deviation > TAX_DEVIATION_THRESHOLD) {
-          findings.push({
-            code,
-            title: `${cat.toUpperCase()} looks off`,
-            detail:
-              `${cat.toUpperCase()} is ${rupees(actual)}, but ~1% of service fees ` +
-              `would be ${rupees(expectedTax)}. Worth a check.`,
-            amountPaise: Math.abs(actual - expectedTax),
-            severity: 'low',
-            disputable: false,
-          });
-        }
+    ];
+    for (const [category, code] of taxRules) {
+      const actual = sumCategories(stmt, category);
+      const deviation = Math.abs(actual - expectedTax) / expectedTax;
+      if (actual > 0 && deviation > TAX_DEVIATION_THRESHOLD) {
+        const label = category.toUpperCase();
+        findings.push({
+          code,
+          title: `${label} looks off`,
+          detail:
+            `${label} is ${rupees(actual)}, but ~1% of service fees ` +
+            `would be ${rupees(expectedTax)}. Worth a check.`,
+          amountPaise: Math.abs(actual - expectedTax),
+          severity: 'low',
+          disputable: false,
+        });
       }
     }
   }
@@ -183,14 +195,13 @@ export function analyzeStatement(
     .filter((f) => f.disputable)
     .reduce((acc, f) => acc + f.amountPaise, 0);
 
-  const whatsappSummary = buildWhatsappSummary(stmt, {
+  const totals: SettleTotals = {
     totalDeductionsPaise,
     netPayoutPaise,
     effectiveTakeRatePct,
     mandatoryDeductionsPaise,
     disputablePaise,
-    findings,
-  });
+  };
 
   return {
     platform: stmt.platform,
@@ -198,53 +209,38 @@ export function analyzeStatement(
     periodEnd: stmt.periodEnd,
     orderCount: stmt.orderCount,
     grossSalesPaise: stmt.grossSalesPaise,
-    totalDeductionsPaise,
-    netPayoutPaise,
-    effectiveTakeRatePct,
-    mandatoryDeductionsPaise,
-    disputablePaise,
+    ...totals,
     findings,
-    whatsappSummary,
+    whatsappSummary: buildWhatsappSummary(stmt, totals, findings),
   };
 }
 
 function buildWhatsappSummary(
   stmt: SettleStatement,
-  r: {
-    totalDeductionsPaise: number;
-    netPayoutPaise: number;
-    effectiveTakeRatePct: number;
-    mandatoryDeductionsPaise: number;
-    disputablePaise: number;
-    findings: SettleFinding[];
-  },
+  totals: SettleTotals,
+  findings: SettleFinding[],
 ): string {
-  const lines: string[] = [];
-  lines.push(
+  const lines: string[] = [
     `*${platformName(stmt.platform)} settlement — ${stmt.periodStart} to ${stmt.periodEnd}*`,
-  );
-  lines.push(
     `${stmt.orderCount} orders · Gross ${rupees(stmt.grossSalesPaise)}`,
-  );
-  lines.push(
-    `Deducted: ${rupees(r.totalDeductionsPaise)} (${r.effectiveTakeRatePct}% effective take)`,
-  );
-  lines.push('');
+    `Deducted: ${rupees(totals.totalDeductionsPaise)} (${totals.effectiveTakeRatePct}% effective take)`,
+    '',
+  ];
 
-  const disputableFindings = r.findings.filter((f) => f.disputable);
-  if (r.disputablePaise > 0) {
-    lines.push(`⚠️ Looks disputable: ${rupees(r.disputablePaise)}`);
-    for (const f of disputableFindings) {
+  if (totals.disputablePaise > 0) {
+    lines.push(`⚠️ Looks disputable: ${rupees(totals.disputablePaise)}`);
+    for (const f of findings.filter((f) => f.disputable)) {
       lines.push(`• ${f.title}: ${rupees(f.amountPaise)}`);
     }
   } else {
     lines.push('✅ No obvious disputable deductions this period.');
   }
-  lines.push('');
-  lines.push(`Mandatory (not recoverable): ${rupees(r.mandatoryDeductionsPaise)}`);
-  lines.push(`Net you received: ${rupees(r.netPayoutPaise)}`);
 
-  if (r.disputablePaise > 0) {
+  lines.push('');
+  lines.push(`Mandatory (not recoverable): ${rupees(totals.mandatoryDeductionsPaise)}`);
+  lines.push(`Net you received: ${rupees(totals.netPayoutPaise)}`);
+
+  if (totals.disputablePaise > 0) {
     lines.push('');
     lines.push('Want me to file these disputes for you?');
   }

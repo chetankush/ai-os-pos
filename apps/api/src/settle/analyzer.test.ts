@@ -140,6 +140,34 @@ describe('analyzeStatement', () => {
     });
   });
 
+  describe('TCS_MISMATCH / TDS_MISMATCH', () => {
+    it('flags (non-disputable) when the tax deviates >25% from ~1% of service fees', () => {
+      // commission 20000 → expected tax ≈ 200; actual TCS 500 deviates 150%.
+      const stmt = baseStatement({
+        deductions: [
+          { category: 'commission', label: 'commission', amountPaise: 20_000_00 },
+          { category: 'tcs', label: 'TCS', amountPaise: 500_00 },
+        ],
+      });
+      const r = analyzeStatement(stmt, {});
+      const f = r.findings.find((x) => x.code === 'TCS_MISMATCH');
+      expect(f).toBeDefined();
+      expect(f?.disputable).toBe(false);
+    });
+
+    it('does not flag tax that is within tolerance of the expected ~1%', () => {
+      // commission 20000 → expected tax ≈ 200; actual TCS 200 is on target.
+      const stmt = baseStatement({
+        deductions: [
+          { category: 'commission', label: 'commission', amountPaise: 20_000_00 },
+          { category: 'tcs', label: 'TCS', amountPaise: 200_00 },
+        ],
+      });
+      const r = analyzeStatement(stmt, {});
+      expect(r.findings.find((x) => x.code === 'TCS_MISMATCH')).toBeUndefined();
+    });
+  });
+
   describe('disputable total + mandatory split', () => {
     it('sums only disputable findings into disputablePaise', () => {
       const r = analyzeStatement(baseStatement(), {

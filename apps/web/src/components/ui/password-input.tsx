@@ -27,15 +27,26 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           )}
           {...rest}
         />
+        {/* P2 touch-target: size-11 (44px) hit area. P1 aria: pressed state + dynamic
+            label announce visibility. tabIndex=-1 keeps tab order on the field itself. */}
         <button
           type="button"
           onClick={() => setVisible((v) => !v)}
           aria-label={visible ? 'Hide password' : 'Show password'}
           aria-pressed={visible}
           tabIndex={-1}
-          className="absolute right-0 top-0 grid place-items-center size-11 text-muted hover:text-fg transition-colors"
+          className={cn(
+            'absolute right-0 top-0 grid size-11 place-items-center rounded-lg text-muted',
+            'transition-colors touch-manipulation outline-none',
+            'hover:text-fg',
+            'focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
+          )}
         >
-          {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          {visible ? (
+            <EyeOff className="size-4" aria-hidden="true" />
+          ) : (
+            <Eye className="size-4" aria-hidden="true" />
+          )}
         </button>
       </div>
     );
