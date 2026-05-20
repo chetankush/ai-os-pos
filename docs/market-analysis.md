@@ -18,7 +18,9 @@ Three things must change:
 2. **The pricing must shift from flat ₹3-5k SaaS → hybrid (₹3k base + % of recovered/upsold GMV)** OR be honestly reframed as a lifestyle SaaS, not a venture bet. Pure flat ₹4k ARPU doesn't clear LTV/CAC = 3x in any modeled scenario.
 3. **The competitive frame must shift from "compete with Posist" → "exploit the Petpooja GST scandal gap"** — an immutable audit trail post the March 2026 raids is a stronger wedge than AI alone.
 
-The ~₹70K Cr restaurant tax-evasion case, Petpooja's bulk-delete feature being seized as Exhibit A across 100+ raids in 45 cities, Zomato's effective 53% take rate, and ₹70K/month staff churn are all *unsolved* by incumbents. The market is open. The current plan undersells the opportunity.
+> **CORRECTION (2026-05-20, after real-data review):** Two numbers earlier in this report were wrong and are corrected throughout: (1) the "53% effective take rate" is unverified — the real sourced range is **25-35%**, and only a single-digit slice of that is actually *disputable* (the rest is contractual commission/GST/fees). (2) "72% of restaurants have payout errors" is **fabricated vendor marketing** (traces to Cointab's site, no survey) — do NOT use it in a pitch. Defensible alternatives: CCPA logged **10,590 complaints vs Swiggy, 7,938 vs Zomato**; Swiggy frames the issue as "<1% of 350,000 partners." Also: real merchant dispute net-recovery is ~**20%**, not the 80% vendors advertise.
+
+The ~₹70K Cr restaurant tax-evasion case, Petpooja's bulk-delete feature being seized as Exhibit A across 100+ raids in 45 cities, Zomato's commission squeeze (25-35% effective take rate), and staff churn are all *unsolved* by incumbents. The market is open. The current plan undersells the opportunity.
 
 ---
 
@@ -28,8 +30,8 @@ Across G2/Capterra/Reddit/NRAI/news scraping, the **same five complaints surface
 
 | # | Pain | Frequency | Incumbent Solve | Mehfil Opportunity |
 |---|---|---|---|---|
-| 1 | **Aggregator commission squeeze** — Zomato effective take rate **53%**, cloud kitchens 60-65% | Universal | None convincingly | ★★★★★ |
-| 2 | **Payout reconciliation hell** — 72% of restaurants find errors; one Bengaluru cafe recovered ₹13 lakh in disputes | Daily | Manual export tools only (Cointab/Optipro/UrbanPiper) | ★★★★★ |
+| 1 | **Aggregator commission squeeze** — Zomato effective take rate **25-35%** (only a single-digit slice disputable); cloud kitchens higher | Universal | None convincingly | ★★★★★ |
+| 2 | **Payout reconciliation hell** — CCPA: 10,590 complaints vs Swiggy, 7,938 vs Zomato; named owners losing lakhs to unauthorized ad/discount deductions | Daily | Manual export tools only (Cointab/Optipro/UrbanPiper) | ★★★★★ |
 | 3 | **Staff theft + billing fraud** — 95% of restaurants report it; 14-month avg detection; ₹70K Cr nationwide | Universal | Rules-based logs only; no anomaly AI | ★★★★★ |
 | 4 | **Daily P&L invisibility** — owners discover losses month-end; per-dish margin requires manual BOM | Universal | None — MarginEdge/Tenzo exist abroad, not in India | ★★★★ |
 | 5 | **Rating diagnostic vacuum** — "rating dropped" = no root cause; owners panic-discount | Daily | None | ★★★★ |
@@ -83,7 +85,7 @@ Inside the QR ordering flow + answers cafe phone. DeepSeek V4 Flash + heavy prom
 
 Pulls Zomato/Swiggy/ONDC settlement files daily. Flags unauthorized ads, auto-applied discounts, refund overcharges, commission mismatches. 11 AM daily WhatsApp summary to the owner.
 
-**This is the highest-ROI feature in the entire stack.** Effective Zomato take rate is 53%, not 25-30%. A ₹15L cafe leaks ₹5.5L/month to aggregators. Bengaluru cafe Bamey's recovered ₹13L in disputes alone. **No incumbent does this natively. The math is irrefutable in sales pitches.**
+**This is the highest-ROI feature in the entire stack — but it's a WEDGE, not a standalone business** (see Section 11 for why recovery TAM depletes as you succeed). Effective Zomato take rate is 25-35%; the mandatory commission/GST/fees are not recoverable, but the *disputable* slice — unauthorized ads, discounts applied wider/longer than approved, customer-fault refunds charged to the restaurant, missing orders — is real money and growing (Swiggy ran ads without consent for months, deducting ₹10k-20L per restaurant; MediaNama Apr 2026). **No incumbent pursues the dispute end-to-end — they stop at reporting the error. That dispute-pursuit is the wedge.** Be conservative in the pitch: real net-recovery is ~20%, and the cafe can check your math against its own bank statement.
 
 ### Pillar 3: "Pulse" — Daily P&L + Margin Doctor
 
@@ -274,7 +276,7 @@ Everything else fades next to this discovery:
 
 **WhatsApp's 24-hour utility-free window means the entire order lifecycle (confirm → kitchen → dispatch → delivered) costs ₹0 when the customer initiated the chat.** Only retargeting messages cost ~₹1.09 each.
 
-**Per-order WhatsApp cost: ₹1-2.** Per-order Zomato cost on a ₹500 order: ~₹150 after the 53% take rate.
+**Per-order WhatsApp cost: ₹1-2.** Per-order Zomato cost on a ₹500 order: ~₹125-175 after commission, GST, fees, and (often) ads/discount share.
 
 This is the "Mehfil Direct" module. The pitch:
 
@@ -299,7 +301,7 @@ This is the "Mehfil Direct" module. The pitch:
 | Long-distance surcharge | -₹1.50 |
 | **Restaurant nets** | **₹47.00** |
 
-**Effective take rate: 53%.**
+**All-in cost including discretionary ads + discounts can approach ~45-53% — but the MANDATORY take (commission + GST + platform/PG fees) is 25-35%, and only the discretionary/erroneous slice is disputable. Use 25-35% as the headline; never claim 53% as the take rate.**
 
 ---
 

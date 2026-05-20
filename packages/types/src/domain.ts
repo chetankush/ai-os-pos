@@ -105,3 +105,91 @@ export interface Order {
 export interface OrderWithItems extends Order {
   items: OrderItem[];
 }
+
+// ─── Settle (aggregator reconciliation + dispute recovery) ──────────────────────
+
+export type SettlePlatform = 'zomato' | 'swiggy';
+
+export type SettleCategory =
+  | 'commission'
+  | 'service_fee'
+  | 'payment_gateway'
+  | 'ads'
+  | 'discount'
+  | 'refund'
+  | 'cancellation'
+  | 'tcs'
+  | 'tds'
+  | 'gst'
+  | 'packaging'
+  | 'delivery'
+  | 'other';
+
+export interface SettleDeduction {
+  category: SettleCategory;
+  /** Raw label as it appeared in the statement. */
+  label: string;
+  /** Positive magnitude in paise (money taken from the restaurant). */
+  amountPaise: number;
+}
+
+/** A normalized, platform-agnostic settlement statement. */
+export interface SettleStatement {
+  platform: SettlePlatform;
+  periodStart: string; // ISO date
+  periodEnd: string; // ISO date
+  orderCount: number;
+  /** Gross value of food sold (sum of order subtotals), in paise. */
+  grossSalesPaise: number;
+  deductions: SettleDeduction[];
+  /** Net amount the platform says it paid out, in paise (optional — we derive it). */
+  netPayoutPaise?: number;
+}
+
+export interface SettleConfig {
+  /** The commission rate the cafe actually contracted, e.g. 22 (%). */
+  contractedCommissionRatePct?: number;
+  /** Did the owner consent to ads this period? Default false → ads flagged. */
+  adsConsented?: boolean;
+  /** Did the owner approve the discounts this period? Default false → flagged for review. */
+  discountsApproved?: boolean;
+}
+
+export type SettleFindingCode =
+  | 'UNAUTHORIZED_ADS'
+  | 'COMMISSION_OVERCHARGE'
+  | 'DISCOUNT_REVIEW'
+  | 'REFUND_DEDUCTION'
+  | 'HIGH_TAKE_RATE'
+  | 'TCS_MISMATCH'
+  | 'TDS_MISMATCH';
+
+export interface SettleFinding {
+  code: SettleFindingCode;
+  title: string;
+  detail: string;
+  /** At-risk / disputable amount in paise. */
+  amountPaise: number;
+  severity: 'high' | 'medium' | 'low';
+  /** Whether this amount is realistically recoverable via dispute. */
+  disputable: boolean;
+}
+
+export interface SettleReport {
+  platform: SettlePlatform;
+  periodStart: string;
+  periodEnd: string;
+  orderCount: number;
+  grossSalesPaise: number;
+  totalDeductionsPaise: number;
+  netPayoutPaise: number;
+  /** totalDeductions / grossSales * 100, rounded to 1 dp. */
+  effectiveTakeRatePct: number;
+  /** Deductions that are contractual and NOT recoverable. */
+  mandatoryDeductionsPaise: number;
+  /** Sum of disputable findings — the recoverable headline number. */
+  disputablePaise: number;
+  findings: SettleFinding[];
+  /** WhatsApp-ready plain-text summary. */
+  whatsappSummary: string;
+}

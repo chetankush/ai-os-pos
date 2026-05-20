@@ -10,6 +10,9 @@ import type {
   Order,
   OrderStatus,
   OrderWithItems,
+  SettleConfig,
+  SettleReport,
+  SettleStatement,
 } from './domain.js';
 
 export interface ApiError {
@@ -131,4 +134,16 @@ export interface OrderStatsResponse {
   todayCount: number;
   todayRevenuePaise: number;
   byStatus: Record<OrderStatus, number>;
+}
+
+// ─── Settle ─────────────────────────────────────────────────────────────────
+
+/** Analyze a statement that has already been normalized client- or server-side. */
+export interface SettleAnalyzeRequest {
+  statement: SettleStatement;
+  config?: SettleConfig;
+}
+
+export interface SettleAnalyzeResponse {
+  report: SettleReport;
 }
