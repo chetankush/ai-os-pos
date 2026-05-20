@@ -42,6 +42,17 @@ const createOrderBodySchema = z.object({
       }),
     )
     .min(1, 'order must contain at least one item'),
+  // Bill-level adjustments — owner/counter only.
+  discount: z
+    .object({
+      type: z.enum(['percent', 'flat']),
+      value: z.number().min(0),
+      reason: z.string().trim().max(120).optional(),
+    })
+    .optional(),
+  serviceChargeBp: z.number().int().min(0).max(10000).optional(),
+  packagingChargePaise: z.number().int().min(0).optional(),
+  roundOff: z.boolean().optional(),
 });
 
 const updateStatusBodySchema = z.object({
@@ -94,7 +105,12 @@ export async function ordersRoutes(
 
       let built: ReturnType<typeof buildOrder>;
       try {
-        built = buildOrder(cafe, menu, body.items);
+        built = buildOrder(cafe, menu, body.items, {
+          discount: body.discount,
+          serviceChargeBp: body.serviceChargeBp,
+          packagingChargePaise: body.packagingChargePaise,
+          roundOff: body.roundOff,
+        });
       } catch (err) {
         if (err instanceof OrderBuildError) {
           return reply.status(400).send({
@@ -113,7 +129,12 @@ export async function ordersRoutes(
         customerPhone: body.customerPhone ?? null,
         notes: body.notes ?? null,
         subtotalPaise: built.subtotalPaise,
+        discountPaise: built.discountPaise,
+        discountReason: built.discountReason,
+        serviceChargePaise: built.serviceChargePaise,
+        packagingChargePaise: built.packagingChargePaise,
         taxPaise: built.taxPaise,
+        roundOffPaise: built.roundOffPaise,
         totalPaise: built.totalPaise,
         gstRateBp: built.gstRateBp,
         items: built.items,

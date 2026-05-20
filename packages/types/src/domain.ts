@@ -113,7 +113,12 @@ export interface Order {
   customerPhone: string | null;
   notes: string | null;
   subtotalPaise: number;
+  discountPaise: number;
+  discountReason: string | null;
+  serviceChargePaise: number;
+  packagingChargePaise: number;
   taxPaise: number;
+  roundOffPaise: number;
   totalPaise: number;
   gstRateBp: number;
   paymentMethod: PaymentMethod | null;

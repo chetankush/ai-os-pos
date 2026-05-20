@@ -28,7 +28,12 @@ export interface NewOrder {
   customerPhone: string | null;
   notes: string | null;
   subtotalPaise: number;
+  discountPaise: number;
+  discountReason: string | null;
+  serviceChargePaise: number;
+  packagingChargePaise: number;
   taxPaise: number;
+  roundOffPaise: number;
   totalPaise: number;
   gstRateBp: number;
   items: NewOrderItem[];
@@ -104,7 +109,12 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
             customerPhone: data.customerPhone,
             notes: data.notes,
             subtotalPaise: data.subtotalPaise,
+            discountPaise: data.discountPaise,
+            discountReason: data.discountReason,
+            serviceChargePaise: data.serviceChargePaise,
+            packagingChargePaise: data.packagingChargePaise,
             taxPaise: data.taxPaise,
+            roundOffPaise: data.roundOffPaise,
             totalPaise: data.totalPaise,
             gstRateBp: data.gstRateBp,
           })

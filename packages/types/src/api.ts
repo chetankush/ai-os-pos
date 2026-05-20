@@ -144,6 +144,11 @@ export interface CreateOrderRequest {
     quantity: number;
     notes?: string;
   }>;
+  /** Bill-level adjustments (counter/owner flow only — diners can't discount). */
+  discount?: { type: 'percent' | 'flat'; value: number; reason?: string };
+  serviceChargeBp?: number;
+  packagingChargePaise?: number;
+  roundOff?: boolean;
 }
 
 export interface OrderResponse {

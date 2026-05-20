@@ -55,7 +55,14 @@ export const orders = pgTable(
 
     // Money in paise (integer) for exactness. Indian POS convention.
     subtotalPaise: integer().notNull().default(0),
+    // Bill-level adjustments (pre-tax discount; charges added to the taxable base).
+    discountPaise: integer().notNull().default(0),
+    discountReason: text(),
+    serviceChargePaise: integer().notNull().default(0),
+    packagingChargePaise: integer().notNull().default(0),
     taxPaise: integer().notNull().default(0),
+    // Nearest-rupee rounding delta applied to reach the payable total (can be negative).
+    roundOffPaise: integer().notNull().default(0),
     totalPaise: integer().notNull().default(0),
 
     // GST rate stored in basis points (500 = 5.00%, 1800 = 18.00%) so we

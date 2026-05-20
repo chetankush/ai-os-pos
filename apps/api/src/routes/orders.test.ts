@@ -82,7 +82,12 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
     customerPhone: null,
     notes: null,
     subtotalPaise: 30000,
+    discountPaise: 0,
+    discountReason: null,
+    serviceChargePaise: 0,
+    packagingChargePaise: 0,
     taxPaise: 1500,
+    roundOffPaise: 0,
     totalPaise: 31500,
     gstRateBp: 500,
     paymentMethod: null,
@@ -236,6 +241,34 @@ describe('orders endpoints', () => {
       expect(call).not.toHaveProperty('orderNumber');
       // The mock repo returns the canonical INV/{fy}/{seq6} format.
       expect(res.json().order.orderNumber).toMatch(/^INV\/\d{4}-\d{2}\/\d{6}$/);
+    });
+
+    it('applies bill-level discount, charges, and round-off', async () => {
+      ordersRepo.create.mockResolvedValueOnce(makeOrderWithItems());
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/orders`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: {
+          items: [{ menuItemId: ITEM_ID, quantity: 2 }], // 30000
+          discount: { type: 'percent', value: 10, reason: 'regular' }, // -3000
+          serviceChargeBp: 1000, // 10% of 27000 = 2700
+          packagingChargePaise: 1000,
+          roundOff: true,
+        },
+      });
+
+      expect(res.statusCode).toBe(201);
+      const call = ordersRepo.create.mock.calls[0]?.[0];
+      expect(call?.subtotalPaise).toBe(30000);
+      expect(call?.discountPaise).toBe(3000);
+      expect(call?.discountReason).toBe('regular');
+      expect(call?.serviceChargePaise).toBe(2700);
+      expect(call?.packagingChargePaise).toBe(1000);
+      expect(call?.taxPaise).toBe(1535); // 5% of 30700
+      expect(call?.roundOffPaise).toBe(-35);
+      expect(call?.totalPaise).toBe(32200);
     });
 
     it('rejects empty items array', async () => {
