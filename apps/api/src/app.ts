@@ -55,10 +55,15 @@ export async function buildApp(env: Env): Promise<FastifyInstance> {
     app.log.warn('DATABASE_URL not set — db-backed routes will not work');
   }
 
-  if (env.SUPABASE_JWT_SECRET) {
-    await app.register(authPlugin, { jwtSecret: env.SUPABASE_JWT_SECRET });
+  if (env.SUPABASE_JWT_SECRET || env.SUPABASE_URL) {
+    await app.register(authPlugin, {
+      jwtSecret: env.SUPABASE_JWT_SECRET,
+      supabaseUrl: env.SUPABASE_URL,
+    });
   } else {
-    app.log.warn('SUPABASE_JWT_SECRET not set — auth-protected routes will not work');
+    app.log.warn(
+      'No SUPABASE_URL or SUPABASE_JWT_SECRET set — auth-protected routes will not work',
+    );
   }
 
   registerErrorHandler(app);

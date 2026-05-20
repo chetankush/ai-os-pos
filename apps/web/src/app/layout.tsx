@@ -27,8 +27,20 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable}`}
+      suppressHydrationWarning
+    >
       <body className="bg-bg text-fg antialiased">
+        {/* Apply saved theme before paint to avoid a flash. Default = light. */}
+        <script
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: tiny inline theme bootstrap
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}",
+          }}
+        />
         {children}
         <Toaster
           position="top-center"

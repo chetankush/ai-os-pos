@@ -6,6 +6,9 @@ const envSchema = z.object({
   HOST: z.string().default('0.0.0.0'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   DATABASE_URL: z.string().url().optional(),
+  // Supabase project URL — enables ES256/RS256 token verification via JWKS.
+  SUPABASE_URL: z.string().url().optional(),
+  // Legacy HS256 shared secret — used for HS256 tokens (tests / older projects).
   SUPABASE_JWT_SECRET: z.string().min(1).optional(),
   CORS_ORIGINS: z
     .string()

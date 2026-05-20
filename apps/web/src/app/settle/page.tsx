@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { FadeIn } from '@/components/ui/motion';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { SettleTool } from './settle-tool';
 
 export const metadata = { title: 'Settle · Sangam' };
@@ -21,13 +22,16 @@ export default function SettlePage() {
               Sangam <span className="text-muted font-normal">Settle</span>
             </span>
           </Link>
-          <Link
-            href="/cafes"
-            className="inline-flex items-center gap-1.5 min-h-11 px-2 -mr-2 rounded-md text-xs text-muted hover:text-fg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-          >
-            <ArrowLeft className="size-3.5" aria-hidden="true" />
-            Dashboard
-          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Link
+              href="/cafes"
+              className="inline-flex items-center gap-1.5 min-h-11 px-2 -mr-2 rounded-md text-xs text-muted hover:text-fg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            >
+              <ArrowLeft className="size-3.5" aria-hidden="true" />
+              Dashboard
+            </Link>
+          </div>
         </div>
       </header>
 

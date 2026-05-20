@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { FadeIn } from '@/components/ui/motion';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh grid lg:grid-cols-2">
+    <div className="relative min-h-dvh grid lg:grid-cols-2">
+      <ThemeToggle className="absolute right-4 top-4 z-10" />
       {/* Left: form */}
       <main className="flex flex-col items-center justify-center px-6 py-12 lg:px-12">
         <div className="w-full max-w-sm">

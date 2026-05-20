@@ -1,10 +1,15 @@
 @import "tailwindcss";
 
+/* Class-based dark mode: the `.dark` class on <html> activates dark tokens and
+   all `dark:` utilities. Default (no class) = light/white mode. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
 
-  --color-bg: #fefefe;
+  /* Light (white) mode — the default. */
+  --color-bg: #ffffff;
   --color-fg: #1c1917;
   --color-muted: #78716c;
   --color-subtle: #fafaf9;
@@ -16,17 +21,16 @@
   --color-success: #16a34a;
 }
 
-@media (prefers-color-scheme: dark) {
-  @theme {
-    --color-bg: #0c0c0e;
-    --color-fg: #fafaf9;
-    --color-muted: #a8a29e;
-    --color-subtle: #1c1917;
-    --color-border: #292524;
-    --color-border-strong: #44403c;
-    --color-accent: #fafaf9;
-    --color-accent-fg: #1c1917;
-  }
+/* Dark mode — applied only when <html class="dark"> (set by the theme toggle). */
+.dark {
+  --color-bg: #0c0c0e;
+  --color-fg: #fafaf9;
+  --color-muted: #a8a29e;
+  --color-subtle: #1c1917;
+  --color-border: #292524;
+  --color-border-strong: #44403c;
+  --color-accent: #fafaf9;
+  --color-accent-fg: #1c1917;
 }
 
 html,

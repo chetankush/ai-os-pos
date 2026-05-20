@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { signOutAction } from './actions';
 
 export default async function CafesLayout({
@@ -35,10 +36,11 @@ export default async function CafesLayout({
             </span>
           </Link>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
             <span className="hidden sm:inline text-xs text-muted">
               {user.email}
             </span>
+            <ThemeToggle />
             <form action={signOutAction}>
               <Button type="submit" variant="ghost" size="sm">
                 Sign out
