@@ -6,6 +6,7 @@ import { healthRoutes } from './health.js';
 import { menuRoutes } from './menu.js';
 import { ordersRoutes } from './orders.js';
 import { paymentsRoutes } from './payments.js';
+import { reportsRoutes } from './reports.js';
 import { publicRoutes } from './public.js';
 import { settleRoutes } from './settle.js';
 import { tableSessionsRoutes } from './table-sessions.js';
@@ -23,6 +24,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     await app.register(cafesRoutes);
     await app.register(menuRoutes);
     await app.register(ordersRoutes);
+    await app.register(reportsRoutes);
     await app.register(tablesRoutes);
     await app.register(tableSessionsRoutes);
     await app.register(aiRoutes);
