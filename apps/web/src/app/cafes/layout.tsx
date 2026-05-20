@@ -28,10 +28,10 @@ export default async function CafesLayout({
         <div className="mx-auto max-w-6xl px-6 py-3 flex items-center justify-between">
           <Link href="/cafes" className="inline-flex items-center gap-2">
             <span className="size-6 rounded-md bg-accent text-accent-fg grid place-items-center text-[11px] font-bold">
-              M
+              S
             </span>
             <span className="text-sm font-semibold tracking-tight">
-              Mehfil
+              Sangam
             </span>
           </Link>
 
@@ -54,7 +54,7 @@ export default async function CafesLayout({
 
       <footer className="border-t border-border">
         <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between text-xs text-muted">
-          <span>© {new Date().getFullYear()} Mehfil</span>
+          <span>© {new Date().getFullYear()} Sangam</span>
           <span className="font-mono">v0.0.1</span>
         </div>
       </footer>

@@ -1,4 +1,4 @@
-import type { SettleCategory, SettleDeduction } from '@mehfil/types';
+import type { SettleCategory, SettleDeduction } from '@sangam/types';
 
 /**
  * Maps a raw statement line label to a normalized category using keyword

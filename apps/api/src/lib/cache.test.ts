@@ -107,7 +107,7 @@ describe('getCache — real cache (REDIS_URL set)', () => {
   });
 
   it('get returns parsed JSON when redis returns a JSON string', async () => {
-    const payload = { id: 1, name: 'Mehfil' };
+    const payload = { id: 1, name: 'Sangam' };
     redisMocks.get.mockResolvedValueOnce(JSON.stringify(payload));
 
     const { getCache } = await import('./cache.js');

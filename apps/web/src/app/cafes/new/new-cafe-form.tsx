@@ -1,6 +1,6 @@
 'use client';
 
-import type { CreateCafeRequest } from '@mehfil/types';
+import type { CreateCafeRequest } from '@sangam/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';

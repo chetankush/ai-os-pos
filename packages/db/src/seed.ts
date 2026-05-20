@@ -10,7 +10,7 @@ import * as schema from './schema/index.js';
  * Owner is the Supabase auth user that the app logs in as. Defaults to the
  * `admin@testpos.com` test user; override with SEED_OWNER_ID.
  *
- * Run: DATABASE_URL=... pnpm --filter @mehfil/db db:seed
+ * Run: DATABASE_URL=... pnpm --filter @sangam/db db:seed
  */
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -114,7 +114,7 @@ function isoMinutesAgo(min: number): string {
 }
 
 function orderNumber(i: number): string {
-  return `M-${String(100001 + i)}`;
+  return `S-${String(100001 + i)}`;
 }
 
 async function main(): Promise<void> {

@@ -1,4 +1,4 @@
-import type { OrderStatus } from '@mehfil/types';
+import type { OrderStatus } from '@sangam/types';
 import { cn } from '@/lib/cn';
 
 /**

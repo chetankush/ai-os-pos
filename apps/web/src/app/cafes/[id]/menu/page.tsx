@@ -1,4 +1,4 @@
-import type { CafeResponse, MenuResponse } from '@mehfil/types';
+import type { CafeResponse, MenuResponse } from '@sangam/types';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -6,7 +6,7 @@ import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/api-server';
 import { MenuEditor } from './menu-editor';
 
-export const metadata = { title: 'Menu · Mehfil' };
+export const metadata = { title: 'Menu · Sangam' };
 
 interface PageProps {
   params: Promise<{ id: string }>;

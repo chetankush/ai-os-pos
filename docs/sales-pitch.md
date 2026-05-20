@@ -1,4 +1,4 @@
-# Mehfil / Settle — Sales Playbook
+# Sangam / Settle — Sales Playbook
 
 *Field-ready. What to say to cafe & restaurant owners, how to attract them, how to close. Lead with Settle (the validated wedge), not "POS" or "AI."*
 
@@ -54,7 +54,7 @@ Why it works: zero risk for them, specific (money, not features), and it forces 
 |---|---|---|
 | **Young first-timer** (Sector 18 / Cyber Hub cafe) | Looking professional, not losing money blindly | "See your real numbers on one screen — recovered money + daily profit." |
 | **Regional chain owner** (3-10 outlets) | Control across outlets, clean books | "One dashboard for all outlets + recovered aggregator money + a clean audit trail your CA & investors can check." |
-| **Veteran restaurateur** (older, distrusts tech) | Protection, trust, Hindi | *(in Hindi)* "Petpooja waale 100+ restaurants pe raid hua. Mehfil mein bulk-delete nahi hai — har edit logged. Aur main aapka kaata hua Zomato paisa wapas dilata hu." |
+| **Veteran restaurateur** (older, distrusts tech) | Protection, trust, Hindi | *(in Hindi)* "Petpooja waale 100+ restaurants pe raid hua. Sangam mein bulk-delete nahi hai — har edit logged. Aur main aapka kaata hua Zomato paisa wapas dilata hu." |
 
 ---
 
@@ -97,7 +97,7 @@ Why it works: zero risk for them, specific (money, not features), and it forces 
 - **Flat ₹1,000-1,500/month.** Predictable. Frame against value: *"₹1,500 dekar ₹5,000+ wapas — har mahine."*
 - Optional success fee only on large one-time backlog recoveries.
 - **Never** lead with "% of recovery" — sounds like you'll inflate numbers, and it shrinks as you fix their leaks.
-- The ROI line for the bigger pitch later: *"₹4k vs ₹85k"* — Mehfil costs ₹4k; it replaces ₹35k of staff or recovers ₹50k of lost orders.
+- The ROI line for the bigger pitch later: *"₹4k vs ₹85k"* — Sangam costs ₹4k; it replaces ₹35k of staff or recovers ₹50k of lost orders.
 
 ---
 

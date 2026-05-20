@@ -50,7 +50,7 @@ export function SignupForm() {
       return;
     }
     if (!EMAIL_RE.test(email.trim())) {
-      setEmailError('Enter a valid email address (e.g. you@mehfil.in).');
+      setEmailError('Enter a valid email address (e.g. you@sangam.in).');
       emailRef.current?.focus();
       return;
     }
@@ -112,7 +112,7 @@ export function SignupForm() {
             setEmail(e.target.value);
             if (emailError) setEmailError(null);
           }}
-          placeholder="you@mehfil.in"
+          placeholder="you@sangam.in"
         />
       </Field>
 

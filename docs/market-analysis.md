@@ -1,7 +1,7 @@
-# Mehfil — Business Analyst Report
+# Sangam — Business Analyst Report
 
 **Synthesis date:** 2026-05-20
-**Research scope:** 11 parallel research streams covering global POS benchmarks, Indian POS competitor depth, AI-in-restaurant reality check, unsolved Indian restaurant pain points, restaurant-tech failure post-mortems, Indian B2B SaaS GTM playbook, WhatsApp/aggregator-escape mechanics, cafe owner archetypes + Delhi NCR regulation, POS UI/UX design research, brand positioning for Mehfil, vernacular AI (Hindi-English code-switching), and 36-month financial model + unit economics.
+**Research scope:** 11 parallel research streams covering global POS benchmarks, Indian POS competitor depth, AI-in-restaurant reality check, unsolved Indian restaurant pain points, restaurant-tech failure post-mortems, Indian B2B SaaS GTM playbook, WhatsApp/aggregator-escape mechanics, cafe owner archetypes + Delhi NCR regulation, POS UI/UX design research, brand positioning for Sangam, vernacular AI (Hindi-English code-switching), and 36-month financial model + unit economics.
 **Posture:** Brutally honest, opinionated, quantitative. Cites research inline.
 
 ---
@@ -28,7 +28,7 @@ The ~₹70K Cr restaurant tax-evasion case, Petpooja's bulk-delete feature being
 
 Across G2/Capterra/Reddit/NRAI/news scraping, the **same five complaints surface across every Indian POS vendor:**
 
-| # | Pain | Frequency | Incumbent Solve | Mehfil Opportunity |
+| # | Pain | Frequency | Incumbent Solve | Sangam Opportunity |
 |---|---|---|---|---|
 | 1 | **Aggregator commission squeeze** — Zomato effective take rate **25-35%** (only a single-digit slice disputable); cloud kitchens higher | Universal | None convincingly | ★★★★★ |
 | 2 | **Payout reconciliation hell** — CCPA: 10,590 complaints vs Swiggy, 7,938 vs Zomato; named owners losing lakhs to unauthorized ad/discount deductions | Daily | Manual export tools only (Cointab/Optipro/UrbanPiper) | ★★★★★ |
@@ -36,7 +36,7 @@ Across G2/Capterra/Reddit/NRAI/news scraping, the **same five complaints surface
 | 4 | **Daily P&L invisibility** — owners discover losses month-end; per-dish margin requires manual BOM | Universal | None — MarginEdge/Tenzo exist abroad, not in India | ★★★★ |
 | 5 | **Rating diagnostic vacuum** — "rating dropped" = no root cause; owners panic-discount | Daily | None | ★★★★ |
 
-**The gap matrix is unambiguous: incumbents (Petpooja, Posist, DotPe, UrbanPiper, LimeTray) score "None" or "Poor" on all five.** This is the moat Mehfil should occupy.
+**The gap matrix is unambiguous: incumbents (Petpooja, Posist, DotPe, UrbanPiper, LimeTray) score "None" or "Poor" on all five.** This is the moat Sangam should occupy.
 
 What customers SAY they want: lower commission, more customers, less theft.
 What they REVEALEDLY pay for: Petpooja (cheap), Zomato Ads (despite hating).
@@ -61,7 +61,7 @@ What they REVEALEDLY pay for: Petpooja (cheap), Zomato Ads (despite hating).
 
 **Posist pivoted to enterprise in 2016 because the Indian SMB POS model failed for them.** Their co-founder Ashish Tulsian's quote on FounderThesis: *"restaurant owners rarely refer competitors to new software."* No natural referral network. That's why Petpooja took 10 years to ₹76 Cr — vertical SMB SaaS in Indian restaurants compounds slowly because outlets churn (50% close in 3 years), word-of-mouth is weak, and pricing is brutal.
 
-This means **the Mehfil plan to "go SMB premium ₹3-5k" repeats the exact strategy POSist abandoned**. Either you have a real new mechanism (AI + audit trail + commission killer) to make this segment work, or you accept it'll be a lifestyle business.
+This means **the Sangam plan to "go SMB premium ₹3-5k" repeats the exact strategy POSist abandoned**. Either you have a real new mechanism (AI + audit trail + commission killer) to make this segment work, or you accept it'll be a lifestyle business.
 
 ---
 
@@ -147,7 +147,7 @@ If your demo cannot show all 5 of these in 15 minutes — KOT-fired in <8s, Swig
 | Hinglish-Devanagari, 90% cache hit | ~₹0.15-0.30 | ~₹400/mo |
 | 10× price hike scenario | ₹0.5-3.0 | Still trivial |
 
-**AI inference is essentially free at Mehfil's scale.** The economics work; cache hit rate is the lever, not script.
+**AI inference is essentially free at Sangam's scale.** The economics work; cache hit rate is the lever, not script.
 
 ### Hard rules for AI implementation
 
@@ -162,6 +162,21 @@ If your demo cannot show all 5 of these in 15 minutes — KOT-fired in <8s, Swig
    - Chai sugar has 8+ canonical values
    - Religious calendar context (Navratri, Sawan, Karwa Chauth, Ramadan, Paryushan)
    - Hidden allergens (besan, peanut chutney, hing wheat contamination, kasoori methi gluten)
+
+### Data sovereignty (critical — DeepSeek is a Chinese model)
+
+Separate the **model** from the **API**. The DeepSeek *model* (open weights, MIT) is just math and safe to run anywhere. The DeepSeek *API* (`api.deepseek.com`) is China-hosted, governed by Chinese law, and a real risk for Indian customer/financial data.
+
+**Decision (2026-05-20): never send customer PII or settlement/financial data to the China-hosted DeepSeek API.** Three reasons: (1) data sovereignty + Chinese data-access law; (2) India regulatory risk (200+ Chinese apps banned before; several countries already restrict DeepSeek's app/API); (3) it directly **undercuts Sangam's own "your data is your shield / data is yours" positioning** — especially post the Petpooja data-seizure scandal.
+
+| Path | Customer/financial data? |
+|---|---|
+| DeepSeek China API (`api.deepseek.com`) | ❌ — internal dev/testing with fake data only |
+| DeepSeek **open weights** on non-China infra (OpenRouter provider-routing, Together, Fireworks, Bedrock, Azure, self-host) | ✅ |
+| **Gemini 2.5 Flash** (Google) | ✅ — easiest compliance story |
+| **Sarvam** (Indian, best Hindi) | ✅✅ — "your data never leaves India" becomes a *sales line* |
+
+**Recommendation:** customer-facing path defaults to **Gemini Flash + Sarvam**; DeepSeek open-weights on safe infra as a cost lever for non-sensitive tasks. Inference cost is negligible either way (was already ₹0.05-0.30/order), so this trades ~zero cost for turning a risk into a "data stays in India" selling point.
 
 ### The persona
 
@@ -191,7 +206,7 @@ This is the **15-second demo killer** for sales.
 1. **Aarav Kapoor** — 28-32, first-time Sector 18 / GK-II / Cyber Hub cafe owner. ₹15-25L/mo. Tech-friendly, Instagram-obsessed. **Best wedge: rating diagnostic + WhatsApp marketing + Settle.**
 2. **Sanjay Bhasin** — 38-50, 3-10 outlet NCR chain (Cafe Delhi Heights archetype). **Best wedge: multi-outlet console + immutable audit trail + Sentry.**
 3. **Mr. R.K. Khurana** — 55-65, veteran restaurateur (Wengers archetype). Distrusts cloud. **Best wedge: Sentry + Hindi UI + GST-Safe Audit Trail (sell in Hindi, lean into Petpooja scandal).**
-4. **Ishaan Mehta** — cloud kitchen operator. **EXCLUDE from ICP** — positioning weapon: *"Mehfil is for dine-in cafes, not dark kitchens."*
+4. **Ishaan Mehta** — cloud kitchen operator. **EXCLUDE from ICP** — positioning weapon: *"Sangam is for dine-in cafes, not dark kitchens."*
 5. **Ritu Sharma** — franchisee. Can't replace HQ POS. **Sell parallel WhatsApp marketing layer only.**
 
 ### The GTM sequence
@@ -224,7 +239,7 @@ This is the **15-second demo killer** for sales.
 - Founder-presence on Inc42/Captable/FounderThesis podcasts (Petpooja/Posist did this for years before scale)
 - NRAI Delhi chapter sponsorship (~₹3-5L per event)
 - WhatsApp community of customer-cafes for organic referral
-- "Powered by Mehfil" diya-mark stickers on cafe doors as free distribution
+- "Powered by Sangam" diya-mark stickers on cafe doors as free distribution
 
 ---
 
@@ -234,36 +249,36 @@ This is the **15-second demo killer** for sales.
 
 **Not "AI-native POS."** That's a feature category.
 
-**"The AI Waiter for Cafes"** — Mehfil owns a *role*, not a product type. Posist can't say it (no AI). Petpooja can't say it (no AI, no hospitality DNA). DotPe can't say it (commission engine). Defensible for 24-36 months.
+**"The AI Waiter for Cafes"** — Sangam owns a *role*, not a product type. Posist can't say it (no AI). Petpooja can't say it (no AI, no hospitality DNA). DotPe can't say it (commission engine). Defensible for 24-36 months.
 
-Category tagline: *"Mehfil is an AI waiter. The POS comes with it."*
+Category tagline: *"Sangam is an AI waiter. The POS comes with it."*
 
 ### Promise
 
-**"Mehfil runs your floor so you can run your cafe."**
+**"Sangam runs your floor so you can run your cafe."**
 
-Two verbs, one cafe, one promise. Distinguishes between *floor labor* (what Mehfil does) and *the business* (what the owner does). Posist runs the back office; Petpooja runs the bill; only Mehfil runs the floor.
+Two verbs, one cafe, one promise. Distinguishes between *floor labor* (what Sangam does) and *the business* (what the owner does). Posist runs the back office; Petpooja runs the bill; only Sangam runs the floor.
 
 ### Visual & voice
 
 - **Archetype**: Caregiver (80%) + Magician (20%). Not Hero, not Sage.
 - **Primary color**: Saffron Ember `#C45A1A` (warm, distinctive — nobody owns warm-spice in this category. Posist is corporate blue. Petpooja is parrot-green. DotPe is purple.)
 - **Type**: Söhne Breit / Geist Sans + Hind (Devanagari pair) + Tiro Devanagari (wordmark only)
-- **Logomark**: Single diya/lantern dot above the "i" in Mehfil. Universal at 16×16.
+- **Logomark**: Single diya/lantern dot above the "i" in Sangam. Universal at 16×16.
 - **Avoid**: "leverage", "revolutionize", "ecosystem", "unlock", "10x", "AI-powered" (use "AI waiter" specifically)
 - **Use**: welcome, remember, host, gather, serve, table, regular, shift, floor, runs, shows up, never misses
 
 ### Pronunciation discipline
 
-Once, in every deck and on the homepage: *"Mehfil. (meh-feel.) A gathering."* That's it. Once. Otherwise an investor will say "may-fill" in a board meeting and the brand sounds like a Walmart deli.
+Once, in every deck and on the homepage: *"Sangam. (meh-feel.) A gathering."* That's it. Once. Otherwise an investor will say "may-fill" in a board meeting and the brand sounds like a Walmart deli.
 
 ### Objection-handling scripts
 
 **"Why pay ₹4k when Petpooja is ₹1.5k?"**
-*"Petpooja is a billing app. Mehfil is a waiter. The ₹2.5k difference replaces ₹35k/month of staff or recovers ₹50k/month in lost orders. The math isn't ₹4k vs ₹1.5k — it's ₹4k vs ₹85k."*
+*"Petpooja is a billing app. Sangam is a waiter. The ₹2.5k difference replaces ₹35k/month of staff or recovers ₹50k/month in lost orders. The math isn't ₹4k vs ₹1.5k — it's ₹4k vs ₹85k."*
 
 **"What about your audit trail after the Petpooja news?"**
-*"100 restaurants raided. ₹5,000 Cr concealed in Punjab. Petpooja's bulk-delete feature is now Exhibit A in court. Mehfil has no bulk delete — every edit is logged with reason, your data is your shield."*
+*"100 restaurants raided. ₹5,000 Cr concealed in Punjab. Petpooja's bulk-delete feature is now Exhibit A in court. Sangam has no bulk delete — every edit is logged with reason, your data is your shield."*
 
 **"What if you shut down in 2 years?"**
 *"Fair question — DotPe is dying. So here's our promise: data export is one-click, always. Your menu, customers, and order history are yours in CSV from day one. We charge monthly. No lock-in."*
@@ -278,9 +293,9 @@ Everything else fades next to this discovery:
 
 **Per-order WhatsApp cost: ₹1-2.** Per-order Zomato cost on a ₹500 order: ~₹125-175 after commission, GST, fees, and (often) ads/discount share.
 
-This is the "Mehfil Direct" module. The pitch:
+This is the "Sangam Direct" module. The pitch:
 
-*"Your monthly Zomato bill is ₹1.8L on ₹6L of GMV. In 6 months, Mehfil Direct moves 25% of your repeat customers to WhatsApp ordering. On that ₹1.5L of recovered revenue, you keep ₹1.42L instead of ₹1.05L. Net new profit: ₹37,000/month. Payback in week 1."*
+*"Your monthly Zomato bill is ₹1.8L on ₹6L of GMV. In 6 months, Sangam Direct moves 25% of your repeat customers to WhatsApp ordering. On that ₹1.5L of recovered revenue, you keep ₹1.42L instead of ₹1.05L. Net new profit: ₹37,000/month. Payback in week 1."*
 
 **Real case study to cite in sales:** Wow! Momo via Gupshup BSP — 30,000 orders in 2 months, 55% direct share over 24 months, 2.9M opt-in WhatsApp database. Eatoes single broadcast: ~900% ROI.
 
@@ -326,7 +341,7 @@ Three compliance features that differentiate:
 ### 3. "License Concierge"
 One screen tracking FSSAI (now perpetual validity from March 2026, annual fee only), MCD Health Trade (LG Saxena announced scrapping July 2025), Delhi Fire NOC (only 801 Delhi restaurants currently have valid ones — DFS sending notices to all), DPCC CTE/CTO, Delhi Police Eating House, Excise, **all three music licenses (PPL + IPRS + Novex — most cafes don't realize they need all three)**. 30/15/7-day push alerts to owner + CA.
 
-**Sales line:** *"Mehfil is the only POS that won't let your FSSAI/Fire NOC lapse."*
+**Sales line:** *"Sangam is the only POS that won't let your FSSAI/Fire NOC lapse."*
 
 ### Delhi NCR regulatory burden snapshot
 
@@ -347,7 +362,7 @@ Total annual compliance for a typical Sector 18 Noida 50-seat cafe with beer: **
 | M30 | 520 | ₹20.8L | ₹2.50 Cr | -30.7 | -₹6.24 Cr |
 | **M36** | **800** | **₹32L** | **₹3.84 Cr** | -37.4 | **-₹8.37 Cr** |
 
-**At Base scenario, Mehfil hits ₹3.84 Cr ARR at month 36 with ₹8.4 Cr cumulative burn.** This is **below the ₹8-12 Cr ARR Series A bar** in 2026 India.
+**At Base scenario, Sangam hits ₹3.84 Cr ARR at month 36 with ₹8.4 Cr cumulative burn.** This is **below the ₹8-12 Cr ARR Series A bar** in 2026 India.
 
 ### LTV/CAC by scenario (lifetime = 24 months)
 
@@ -363,11 +378,11 @@ Total annual compliance for a typical Sector 18 Noida 50-seat cafe with beer: **
 
 ### The critical sensitivity
 
-**Breakeven monthly churn at LTV/CAC = 3x: 3.11%** for Base scenario. SMB POS churn typically runs 3-7% monthly. **Mehfil lives or dies on retention engineering. This is the single most important variable.**
+**Breakeven monthly churn at LTV/CAC = 3x: 3.11%** for Base scenario. SMB POS churn typically runs 3-7% monthly. **Sangam lives or dies on retention engineering. This is the single most important variable.**
 
 ### Petpooja benchmark
 
-Petpooja blended per-outlet revenue: **₹633/month** (after 10 years and 100k outlets). Mehfil at ₹4,000/mo must be **defensibly 6x more valuable per outlet**. That gap is what the 4-pillar wedge has to justify.
+Petpooja blended per-outlet revenue: **₹633/month** (after 10 years and 100k outlets). Sangam at ₹4,000/mo must be **defensibly 6x more valuable per outlet**. That gap is what the 4-pillar wedge has to justify.
 
 ---
 
@@ -375,7 +390,7 @@ Petpooja blended per-outlet revenue: **₹633/month** (after 10 years and 100k o
 
 ### Path A — Venture-backable: AI-First Transactional Pricing
 
-Reframe Mehfil as: **"AI Waiter platform that happens to bundle POS."**
+Reframe Sangam as: **"AI Waiter platform that happens to bundle POS."**
 
 - Pricing: ₹3,000/mo base + 1-2% of upsold/recovered GMV (AI-attributable)
 - Plus payments rails (PG monetization on GMV like DotPe's model — ₹82 Cr off thin SaaS)
@@ -413,9 +428,9 @@ This is a real outcome. Pitch it that way — don't dress it as 10x venture.
 
 5. **AI accuracy fails publicly.** McDonald's-IBM (9 sweet teas) and Presto (SEC-charged for AI-washing) are the cautionary tales. *Mitigation: never claim >99% publicly without telemetry; hard-constrain LLM to validated menu APIs; never let it own pricing; published benchmarks before marketing copy.*
 
-6. **Zomato delists Mehfil-using restaurants.** Recent precedent: Zomato withdrew formal price-parity clause in 2026 but RMs still informally enforce. *Mitigation: position as "channel diversification" not "anti-aggregator"; Mehfil never appears in customer-facing UI on Zomato listings; pricing parity respected.*
+6. **Zomato delists Sangam-using restaurants.** Recent precedent: Zomato withdrew formal price-parity clause in 2026 but RMs still informally enforce. *Mitigation: position as "channel diversification" not "anti-aggregator"; Sangam never appears in customer-facing UI on Zomato listings; pricing parity respected.*
 
-7. **DPDP Act enforcement.** Holding customer PII makes Mehfil a Data Fiduciary. Penalty: up to ₹250 Cr. *Mitigation: DPDPA-by-design from day 1 (explicit consent, purpose limitation, withdrawal flow, audit logs, India-region data residency).*
+7. **DPDP Act enforcement.** Holding customer PII makes Sangam a Data Fiduciary. Penalty: up to ₹250 Cr. *Mitigation: DPDPA-by-design from day 1 (explicit consent, purpose limitation, withdrawal flow, audit logs, India-region data residency).*
 
 8. **Full-stack overreach.** LimeTray died with 12 employees from this. *Mitigation: 4-pillar discipline; defer inventory/CRM/KDS/marketplace until ₹5 Cr ARR.*
 
@@ -486,10 +501,10 @@ Font pair: Geist Sans (Latin) + Hind (Devanagari) + Geist Mono (data/timers, tab
 ## The Three Framings (One-Liner Each)
 
 For your investors:
-> *"Mehfil is the AI waiter for India's 500,000 cafes — the only POS where pricing is tied to upsell GMV, not seat count."*
+> *"Sangam is the AI waiter for India's 500,000 cafes — the only POS where pricing is tied to upsell GMV, not seat count."*
 
 For your customers:
-> *"Mehfil runs your floor so you can run your cafe."*
+> *"Sangam runs your floor so you can run your cafe."*
 
 For yourself, when nobody's watching:
 > *"The moat isn't the AI. The moat is the cleanest audit trail in Indian restaurant POS, after the Petpooja scandal made it the most valuable feature."*

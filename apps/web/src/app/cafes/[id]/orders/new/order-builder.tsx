@@ -6,7 +6,7 @@ import type {
   MenuCategoryWithItems,
   MenuItem,
   OrderResponse,
-} from '@mehfil/types';
+} from '@sangam/types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Minus, Plus, Search, ShoppingBag, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';

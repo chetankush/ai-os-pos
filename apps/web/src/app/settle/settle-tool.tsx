@@ -1,6 +1,6 @@
 'use client';
 
-import type { SettleFinding, SettleReport } from '@mehfil/types';
+import type { SettleFinding, SettleReport } from '@sangam/types';
 import {
   AlertOctagon,
   AlertTriangle,

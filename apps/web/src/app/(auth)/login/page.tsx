@@ -1,6 +1,6 @@
 import { LoginForm } from './login-form';
 
-export const metadata = { title: 'Sign in · Mehfil' };
+export const metadata = { title: 'Sign in · Sangam' };
 
 export default function LoginPage() {
   return (

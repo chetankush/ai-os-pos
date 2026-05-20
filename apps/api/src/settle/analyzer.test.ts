@@ -1,4 +1,4 @@
-import type { SettleStatement } from '@mehfil/types';
+import type { SettleStatement } from '@sangam/types';
 import { describe, expect, it } from 'vitest';
 import { analyzeStatement } from './analyzer.js';
 

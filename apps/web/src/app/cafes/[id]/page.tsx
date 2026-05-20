@@ -3,8 +3,8 @@ import type {
   Order,
   OrderStatsResponse,
   OrdersListResponse,
-} from '@mehfil/types';
-import type { OrderStatus } from '@mehfil/types';
+} from '@sangam/types';
+import type { OrderStatus } from '@sangam/types';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, ArrowRight, ChevronRight } from 'lucide-react';
@@ -15,7 +15,7 @@ import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/api-server';
 import { cn } from '@/lib/cn';
 
-export const metadata = { title: 'Dashboard · Mehfil' };
+export const metadata = { title: 'Dashboard · Sangam' };
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -87,7 +87,7 @@ export default async function CafeDashboardPage({ params }: PageProps) {
         <div className="flex items-start justify-between gap-6">
           <div className="space-y-2">
             <p className="text-sm text-muted font-mono">
-              mehfil.in/{cafe.slug}
+              sangam.in/{cafe.slug}
             </p>
             <h1 className="text-3xl font-semibold tracking-tight">
               {cafe.name}

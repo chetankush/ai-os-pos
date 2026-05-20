@@ -1,6 +1,6 @@
 'use client';
 
-import type { OrderResponse, OrderStatus } from '@mehfil/types';
+import type { OrderResponse, OrderStatus } from '@sangam/types';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { CheckCircle2, ChefHat, PackageCheck, XCircle } from 'lucide-react';

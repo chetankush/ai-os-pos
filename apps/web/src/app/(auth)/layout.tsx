@@ -13,9 +13,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight"
             >
               <span className="size-6 rounded-md bg-accent text-accent-fg grid place-items-center text-[11px] font-bold">
-                M
+                S
               </span>
-              Mehfil
+              Sangam
             </Link>
           </FadeIn>
           <FadeIn delay={0.05}>{children}</FadeIn>

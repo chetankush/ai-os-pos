@@ -1,4 +1,4 @@
-import type { SettleStatement } from '@mehfil/types';
+import type { SettleStatement } from '@sangam/types';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { analyzeStatement } from '../settle/analyzer.js';

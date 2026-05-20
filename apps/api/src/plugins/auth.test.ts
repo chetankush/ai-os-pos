@@ -16,7 +16,7 @@ interface SignArgs {
 async function signTestToken(app: FastifyInstance, args: SignArgs = {}): Promise<string> {
   const payload = {
     sub: args.sub ?? '11111111-1111-1111-1111-111111111111',
-    email: args.email ?? 'nikhil@mehfil.in',
+    email: args.email ?? 'nikhil@sangam.in',
     role: args.role ?? 'authenticated',
     aud: 'authenticated',
   };
@@ -93,7 +93,7 @@ describe('auth plugin', () => {
     const nowSec = Math.floor(Date.now() / 1000);
     const token = app.jwt.sign({
       sub: '11111111-1111-1111-1111-111111111111',
-      email: 'expired@mehfil.in',
+      email: 'expired@sangam.in',
       iat: nowSec - 120,
       exp: nowSec - 60,
     });
@@ -142,7 +142,7 @@ describe('auth plugin', () => {
   it('accepts a valid token and populates request.user', async () => {
     const token = await signTestToken(app, {
       sub: '22222222-2222-2222-2222-222222222222',
-      email: 'owner@mehfil.in',
+      email: 'owner@sangam.in',
     });
 
     const response = await app.inject({
@@ -155,7 +155,7 @@ describe('auth plugin', () => {
     expect(response.json()).toEqual({
       user: {
         id: '22222222-2222-2222-2222-222222222222',
-        email: 'owner@mehfil.in',
+        email: 'owner@sangam.in',
         role: 'authenticated',
       },
     });
@@ -181,7 +181,7 @@ describe('auth plugin', () => {
     const token = app.jwt.sign(
       {
         sub: '44444444-4444-4444-4444-444444444444',
-        email: 'staff@mehfil.in',
+        email: 'staff@sangam.in',
         role: 'staff',
         aud: 'authenticated',
       },

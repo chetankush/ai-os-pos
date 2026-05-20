@@ -1,6 +1,6 @@
 'use client';
 
-import type { MenuCategoryWithItems, MenuItem } from '@mehfil/types';
+import type { MenuCategoryWithItems, MenuItem } from '@sangam/types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Leaf, Plus, ScrollText, Trash2 } from 'lucide-react';
 import { useState, useTransition } from 'react';

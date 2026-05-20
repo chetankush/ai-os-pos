@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { buttonClasses } from '@/components/ui/button';
 import { Card, CardBody, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-export const metadata = { title: 'Not found · Mehfil' };
+export const metadata = { title: 'Not found · Sangam' };
 
 export default function RootNotFound() {
   return (

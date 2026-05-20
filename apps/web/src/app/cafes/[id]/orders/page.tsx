@@ -1,4 +1,4 @@
-import type { CafeResponse, Order, OrdersListResponse } from '@mehfil/types';
+import type { CafeResponse, Order, OrdersListResponse } from '@sangam/types';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, ChevronRight, Plus, Receipt } from 'lucide-react';
@@ -9,7 +9,7 @@ import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/api-server';
 import { StatusPill } from './_components/status-pill';
 
-export const metadata = { title: 'Orders · Mehfil' };
+export const metadata = { title: 'Orders · Sangam' };
 
 interface PageProps {
   params: Promise<{ id: string }>;

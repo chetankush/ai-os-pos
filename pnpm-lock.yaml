@@ -35,10 +35,10 @@ importers:
       '@fastify/sensible':
         specifier: ^6.0.1
         version: 6.0.4
-      '@mehfil/db':
+      '@sangam/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@mehfil/types':
+      '@sangam/types':
         specifier: workspace:*
         version: link:../../packages/types
       drizzle-orm:
@@ -78,12 +78,12 @@ importers:
 
   apps/web:
     dependencies:
-      '@mehfil/types':
-        specifier: workspace:*
-        version: link:../../packages/types
       '@radix-ui/react-alert-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@sangam/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@supabase/ssr':
         specifier: ^0.10.3
         version: 0.10.3(@supabase/supabase-js@2.106.0)

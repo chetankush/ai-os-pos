@@ -4,7 +4,7 @@
 
 ---
 
-### MEHFIL · मेहफिल
+### SANGAM · संगम
 **Zomato aur Swiggy aapse jo extra paisa kaat rahe hain — main wapas dilata hu.**
 *(I recover the money Zomato & Swiggy quietly take from you.)*
 
@@ -50,7 +50,7 @@
 
 ---
 
-**Nikhil** · Mehfil
+**Nikhil** · Sangam
 📱 WhatsApp: [your number]
 ✉️ [your email]
 

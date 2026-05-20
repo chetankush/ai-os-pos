@@ -50,7 +50,7 @@ const updateStatusBodySchema = z.object({
 function generateOrderNumber(): string {
   // Short, terse, unique-per-cafe (enforced by unique index): "M-A3B7F1"
   const r = Math.random().toString(36).slice(2, 8).toUpperCase().padEnd(6, 'X');
-  return `M-${r}`;
+  return `S-${r}`;
 }
 
 // Forward-only state machine; cancel allowed from any non-terminal state.

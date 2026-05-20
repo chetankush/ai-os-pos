@@ -1,5 +1,5 @@
-import { schema, type Database } from '@mehfil/db';
-import type { MenuCategory, MenuCategoryWithItems, MenuItem } from '@mehfil/types';
+import { schema, type Database } from '@sangam/db';
+import type { MenuCategory, MenuCategoryWithItems, MenuItem } from '@sangam/types';
 import { and, asc, eq } from 'drizzle-orm';
 
 export interface NewMenuCategory {

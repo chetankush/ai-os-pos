@@ -1,4 +1,4 @@
-import type { Cafe, MenuCategory, MenuItem } from '@mehfil/types';
+import type { Cafe, MenuCategory, MenuItem } from '@sangam/types';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CafesRepository } from '../repositories/cafes.js';

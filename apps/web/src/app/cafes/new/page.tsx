@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { NewCafeForm } from './new-cafe-form';
 
-export const metadata = { title: 'New cafe · Mehfil' };
+export const metadata = { title: 'New cafe · Sangam' };
 
 export default function NewCafePage() {
   return (

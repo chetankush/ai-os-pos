@@ -6,7 +6,7 @@ import type {
   SettlePlatform,
   SettleReport,
   SettleStatement,
-} from '@mehfil/types';
+} from '@sangam/types';
 
 const COMMISSION_TOLERANCE_PP = 0.5; // percentage points
 const HIGH_TAKE_RATE_PCT = 35;

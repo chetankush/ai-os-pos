@@ -1,4 +1,4 @@
-import type { CafesListResponse } from '@mehfil/types';
+import type { CafesListResponse } from '@sangam/types';
 import Link from 'next/link';
 import { ArrowRight, Plus, Store } from 'lucide-react';
 import { buttonClasses } from '@/components/ui/button';
@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Stagger, StaggerItem } from '@/components/ui/motion';
 import { serverFetch } from '@/lib/api-server';
 
-export const metadata = { title: 'Your cafes · Mehfil' };
+export const metadata = { title: 'Your cafes · Sangam' };
 
 export default async function CafesPage() {
   const { cafes } = await serverFetch<CafesListResponse>('/cafes');

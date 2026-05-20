@@ -1,11 +1,11 @@
-import { schema, type Database } from '@mehfil/db';
+import { schema, type Database } from '@sangam/db';
 import type {
   Order,
   OrderItem,
   OrderStatus,
   OrderStatsResponse,
   OrderWithItems,
-} from '@mehfil/types';
+} from '@sangam/types';
 import { and, count, desc, eq, gte, sql, sum } from 'drizzle-orm';
 
 export interface NewOrderItem {

@@ -7,7 +7,7 @@ import type {
   OrderStatsResponse,
   OrderStatus,
   OrderWithItems,
-} from '@mehfil/types';
+} from '@sangam/types';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CafesRepository } from '../repositories/cafes.js';
@@ -200,7 +200,7 @@ describe('orders endpoints', () => {
       expect(call?.taxPaise).toBe(1500); // 5% of 30000
       expect(call?.totalPaise).toBe(31500);
       expect(call?.items[0]?.itemNameSnapshot).toBe('Cappuccino');
-      expect(call?.orderNumber).toMatch(/^M-[A-Z0-9]{6}$/);
+      expect(call?.orderNumber).toMatch(/^S-[A-Z0-9]{6}$/);
     });
 
     it('rejects empty items array', async () => {

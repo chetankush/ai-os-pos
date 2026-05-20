@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Mehfil — AI-native restaurant OS',
+  title: 'Sangam — AI-native restaurant OS',
   description: 'Modern POS, QR ordering, and AI waiter for Indian cafes.',
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',

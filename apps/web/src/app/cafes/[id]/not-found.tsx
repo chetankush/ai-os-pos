@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 
-export const metadata = { title: 'Cafe not found · Mehfil' };
+export const metadata = { title: 'Cafe not found · Sangam' };
 
 export default function CafeNotFound() {
   return (

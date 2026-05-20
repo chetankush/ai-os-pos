@@ -1,6 +1,6 @@
 /**
  * Core domain entities — kept independent of database concerns.
- * Database row types live in @mehfil/db; these are the API/UI shapes.
+ * Database row types live in @sangam/db; these are the API/UI shapes.
  */
 
 export type CafeId = string;

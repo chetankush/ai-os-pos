@@ -1,4 +1,4 @@
-# Local dev services for Mehfil — fully isolated from other Docker projects
+# Local dev services for Sangam — fully isolated from other Docker projects
 # on this machine. Ports are picked to avoid common collisions:
 #   - Postgres on 5434 (not the default 5432, not 5433 used elsewhere)
 #   - Redis on 6381 (not 6379 used by main Redis, not 6380 used by karibukit)
@@ -7,37 +7,37 @@
 # Stop:    docker compose down
 # Destroy: docker compose down -v   (wipes all data — irreversible)
 # Logs:    docker compose logs -f
-# Shell:   docker compose exec postgres psql -U mehfil mehfil
+# Shell:   docker compose exec postgres psql -U sangam sangam
 #          docker compose exec redis redis-cli
 
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: mehfil_postgres
+    container_name: sangam_postgres
     restart: unless-stopped
     ports:
       - "5434:5432"
     environment:
-      POSTGRES_USER: mehfil
-      POSTGRES_PASSWORD: mehfil
-      POSTGRES_DB: mehfil
+      POSTGRES_USER: sangam
+      POSTGRES_PASSWORD: sangam
+      POSTGRES_DB: sangam
     volumes:
-      - mehfil_pg_data:/var/lib/postgresql/data
+      - sangam_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mehfil -d mehfil"]
+      test: ["CMD-SHELL", "pg_isready -U sangam -d sangam"]
       interval: 5s
       timeout: 3s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: mehfil_redis
+    container_name: sangam_redis
     restart: unless-stopped
     ports:
       - "6381:6379"
     command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
     volumes:
-      - mehfil_redis_data:/data
+      - sangam_redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -45,7 +45,7 @@ services:
       retries: 5
 
 volumes:
-  mehfil_pg_data:
-    name: mehfil_pg_data
-  mehfil_redis_data:
-    name: mehfil_redis_data
+  sangam_pg_data:
+    name: sangam_pg_data
+  sangam_redis_data:
+    name: sangam_redis_data

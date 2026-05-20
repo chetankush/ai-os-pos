@@ -1,6 +1,6 @@
 import { SignupForm } from './signup-form';
 
-export const metadata = { title: 'Create account · Mehfil' };
+export const metadata = { title: 'Create account · Sangam' };
 
 export default function SignupPage() {
   return (

@@ -47,7 +47,7 @@ export function LoginForm() {
       return;
     }
     if (!EMAIL_RE.test(email.trim())) {
-      setEmailError('Enter a valid email address (e.g. you@mehfil.in).');
+      setEmailError('Enter a valid email address (e.g. you@sangam.in).');
       emailRef.current?.focus();
       return;
     }
@@ -99,7 +99,7 @@ export function LoginForm() {
             setEmail(e.target.value);
             if (emailError) setEmailError(null);
           }}
-          placeholder="you@mehfil.in"
+          placeholder="you@sangam.in"
         />
       </Field>
 
@@ -144,7 +144,7 @@ export function LoginForm() {
       </Button>
 
       <p className="text-xs text-muted text-center pt-2">
-        New to Mehfil?{' '}
+        New to Sangam?{' '}
         <Link
           href="/signup"
           className="text-fg font-medium hover:underline underline-offset-4"

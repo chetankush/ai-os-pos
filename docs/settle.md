@@ -152,7 +152,9 @@ Secondary risk: **retaliation fear.** One owner delisted after a ₹13L fight. N
 
 ---
 
-## Reusable DeepSeek audit prompt
+## Reusable audit prompt
+
+> **Data-safety note:** This statement is the cafe's financial data. Do **not** paste real statements into the China-hosted DeepSeek consumer app / `api.deepseek.com`. Use **Gemini 2.5 Flash**, **Sarvam**, or DeepSeek **open weights on non-China infra** (OpenRouter provider-routing / Together / Fireworks / self-host). For the very first manual tests you can redact the cafe name. "Your data never leaves India" is also a selling point — practice it from day one.
 
 ```
 This is a Zomato/Swiggy settlement statement for a restaurant. 

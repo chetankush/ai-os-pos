@@ -1,4 +1,4 @@
-import type { Cafe } from '@mehfil/types';
+import type { Cafe } from '@sangam/types';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CafesRepository, NewCafe } from '../repositories/cafes.js';
@@ -52,11 +52,11 @@ describe('cafes endpoints', () => {
     await app.ready();
 
     ownerToken = app.jwt.sign(
-      { sub: OWNER_ID, email: 'owner@mehfil.in', aud: 'authenticated' },
+      { sub: OWNER_ID, email: 'owner@sangam.in', aud: 'authenticated' },
       { expiresIn: '1h' },
     );
     otherToken = app.jwt.sign(
-      { sub: OTHER_ID, email: 'other@mehfil.in', aud: 'authenticated' },
+      { sub: OTHER_ID, email: 'other@sangam.in', aud: 'authenticated' },
       { expiresIn: '1h' },
     );
   });

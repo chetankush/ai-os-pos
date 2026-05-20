@@ -3,7 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { FadeIn } from '@/components/ui/motion';
 import { SettleTool } from './settle-tool';
 
-export const metadata = { title: 'Settle · Mehfil' };
+export const metadata = { title: 'Settle · Sangam' };
 
 export default function SettlePage() {
   return (
@@ -15,10 +15,10 @@ export default function SettlePage() {
             className="inline-flex items-center gap-2 rounded-md py-1 -mx-1 px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           >
             <span className="size-6 rounded-md bg-accent text-accent-fg grid place-items-center text-[11px] font-bold">
-              M
+              S
             </span>
             <span className="text-sm font-semibold tracking-tight">
-              Mehfil <span className="text-muted font-normal">Settle</span>
+              Sangam <span className="text-muted font-normal">Settle</span>
             </span>
           </Link>
           <Link

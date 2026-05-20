@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['@mehfil/types'],
+  transpilePackages: ['@sangam/types'],
   experimental: {
     typedRoutes: true,
   },

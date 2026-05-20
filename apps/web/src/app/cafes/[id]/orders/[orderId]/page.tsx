@@ -1,4 +1,4 @@
-import type { OrderItem, OrderResponse, OrderStatus } from '@mehfil/types';
+import type { OrderItem, OrderResponse, OrderStatus } from '@sangam/types';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -9,7 +9,7 @@ import { serverFetch } from '@/lib/api-server';
 import { cn } from '@/lib/cn';
 import { OrderActions } from './order-actions';
 
-export const metadata = { title: 'Order · Mehfil' };
+export const metadata = { title: 'Order · Sangam' };
 
 interface PageProps {
   params: Promise<{ id: string; orderId: string }>;
