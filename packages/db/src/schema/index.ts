@@ -1,6 +1,7 @@
 export * from './audit-logs.js';
 export * from './cafes.js';
 export * from './cash-drawer-sessions.js';
+export * from './invoice-sequences.js';
 export * from './menu.js';
 export * from './orders.js';
 export * from './staff.js';

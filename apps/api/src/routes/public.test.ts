@@ -24,6 +24,7 @@ function makeCafe(overrides: Partial<Cafe> = {}): Cafe {
     state: 'UP',
     pincode: '201301',
     isAirConditioned: false,
+    gstMode: 'regular_5',
     primaryColor: null,
     logoUrl: null,
     onlinePaymentEnabled: true,
@@ -38,7 +39,7 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
   return {
     id: ORDER_ID,
     cafeId: CAFE_ID,
-    orderNumber: 'S-AAA111',
+    orderNumber: 'INV/2026-27/000001',
     status: 'pending',
     source: 'qr',
     tableLabel: 'T1',
@@ -140,7 +141,7 @@ describe('GET /public/cafes/:slug/orders/:orderId', () => {
     expect(res.json()).toEqual({
       order: {
         id: ORDER_ID,
-        orderNumber: 'S-AAA111',
+        orderNumber: 'INV/2026-27/000001',
         status: 'pending',
         paymentStatus: 'unpaid',
         totalPaise: 31500,

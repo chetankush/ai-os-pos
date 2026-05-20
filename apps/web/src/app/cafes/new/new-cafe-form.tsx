@@ -17,7 +17,16 @@ const INITIAL: CreateCafeRequest = {
   city: '',
   state: '',
   pincode: '',
+  gstMode: 'regular_5',
 };
+
+// GST regime options shown in the cafe form select.
+const GST_MODE_OPTIONS: { value: NonNullable<CreateCafeRequest['gstMode']>; label: string }[] = [
+  { value: 'regular_5', label: '5% (standard restaurant)' },
+  { value: 'regular_18', label: '18% (in hotel, room tariff > ₹7,500)' },
+  { value: 'composition', label: 'Composition (no GST on bill)' },
+  { value: 'exempt', label: 'Exempt' },
+];
 
 // Subtle "*" marker for required fields. aria-hidden because requiredness is
 // already conveyed via the input's required/aria-required attributes.
@@ -292,6 +301,27 @@ export function NewCafeForm() {
             </Field>
           </div>
 
+          <Field
+            label="GST mode"
+            hint="Determines the tax rate charged on the bill"
+            htmlFor="gstMode"
+          >
+            <select
+              id="gstMode"
+              value={form.gstMode ?? 'regular_5'}
+              onChange={(e) =>
+                update('gstMode', e.target.value as NonNullable<CreateCafeRequest['gstMode']>)
+              }
+              className="h-10 w-full rounded-md border border-border bg-bg px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            >
+              {GST_MODE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
           <label className="flex items-start gap-3 p-3 rounded-md border border-border bg-subtle/40 cursor-pointer hover:border-border-strong transition-colors">
             <input
               type="checkbox"
@@ -302,7 +332,7 @@ export function NewCafeForm() {
             <div className="space-y-0.5">
               <span className="text-sm font-medium">Air-conditioned</span>
               <p className="text-xs text-muted">
-                Affects GST slab — 18% for AC, 5% for non-AC.
+                Informational only — GST is set by the mode above.
               </p>
             </div>
           </label>

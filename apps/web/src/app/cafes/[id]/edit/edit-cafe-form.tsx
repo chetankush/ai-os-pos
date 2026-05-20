@@ -1,6 +1,6 @@
 'use client';
 
-import type { Cafe, CafeResponse, UpdateCafeRequest } from '@sangam/types';
+import type { Cafe, CafeResponse, GstMode, UpdateCafeRequest } from '@sangam/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
@@ -27,10 +27,19 @@ interface FormState {
   gstin: string;
   fssai: string;
   isAirConditioned: boolean;
+  gstMode: GstMode;
   onlinePaymentEnabled: boolean;
   qrPrepaidRequired: boolean;
   primaryColor: string;
 }
+
+// GST regime options shown in the cafe form select.
+const GST_MODE_OPTIONS: { value: GstMode; label: string }[] = [
+  { value: 'regular_5', label: '5% (standard restaurant)' },
+  { value: 'regular_18', label: '18% (in hotel, room tariff > ₹7,500)' },
+  { value: 'composition', label: 'Composition (no GST on bill)' },
+  { value: 'exempt', label: 'Exempt' },
+];
 
 // Subtle "*" marker for required fields. aria-hidden because requiredness is
 // already conveyed via the input's required/aria-required attributes.
@@ -92,6 +101,7 @@ export function EditCafeForm({ cafe }: { cafe: Cafe }) {
     gstin: cafe.gstin ?? '',
     fssai: cafe.fssai ?? '',
     isAirConditioned: cafe.isAirConditioned,
+    gstMode: cafe.gstMode,
     onlinePaymentEnabled: cafe.onlinePaymentEnabled,
     qrPrepaidRequired: cafe.qrPrepaidRequired,
     primaryColor: cafe.primaryColor ?? '',
@@ -159,6 +169,7 @@ export function EditCafeForm({ cafe }: { cafe: Cafe }) {
       gstin: form.gstin.trim() || null,
       fssai: form.fssai.trim() || null,
       isAirConditioned: form.isAirConditioned,
+      gstMode: form.gstMode,
       onlinePaymentEnabled: form.onlinePaymentEnabled,
       // Prepayment is meaningless without online payments — never persist a
       // stale "on" value while the dependent toggle is disabled.
@@ -363,6 +374,25 @@ export function EditCafeForm({ cafe }: { cafe: Cafe }) {
             </Field>
           </div>
 
+          <Field
+            label="GST mode"
+            hint="Determines the tax rate charged on the bill"
+            htmlFor="gstMode"
+          >
+            <select
+              id="gstMode"
+              value={form.gstMode}
+              onChange={(e) => update('gstMode', e.target.value as GstMode)}
+              className="h-10 w-full rounded-md border border-border bg-bg px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            >
+              {GST_MODE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
           <label className="flex items-start gap-3 p-3 rounded-md border border-border bg-subtle/40 cursor-pointer hover:border-border-strong transition-colors">
             <input
               type="checkbox"
@@ -373,7 +403,7 @@ export function EditCafeForm({ cafe }: { cafe: Cafe }) {
             <div className="space-y-0.5">
               <span className="text-sm font-medium">Air-conditioned</span>
               <p className="text-xs text-muted">
-                Affects GST slab — 18% for AC, 5% for non-AC.
+                Informational only — GST is set by the mode above.
               </p>
             </div>
           </label>

@@ -32,6 +32,7 @@ function makeCafe(): Cafe {
     state: 'UP',
     pincode: '201301',
     isAirConditioned: false,
+    gstMode: 'regular_5',
     primaryColor: null,
     logoUrl: null,
     onlinePaymentEnabled: false,

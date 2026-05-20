@@ -147,6 +147,9 @@ async function main(): Promise<void> {
       state: 'Uttar Pradesh',
       pincode: '201301',
       isAirConditioned: true,
+      // Standard restaurant service → 5% GST on the bill (post Sept-2025 reform
+      // the AC flag no longer drives the slab).
+      gstMode: 'regular_5',
       primaryColor: '#C45A1A',
     })
     .returning();

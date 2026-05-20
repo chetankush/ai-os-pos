@@ -8,7 +8,7 @@ import {
   type NewOrder,
   type OrdersRepository,
 } from '../repositories/orders.js';
-import { OrderBuildError, buildOrder, generateOrderNumber } from '../orders/build.js';
+import { OrderBuildError, buildOrder } from '../orders/build.js';
 
 export interface OrdersRoutesOptions {
   repository?: OrdersRepository;
@@ -106,7 +106,6 @@ export async function ordersRoutes(
 
       const newOrder: NewOrder = {
         cafeId,
-        orderNumber: generateOrderNumber(),
         source: body.source ?? 'counter',
         tableLabel: body.tableLabel ?? null,
         tableSessionId: body.tableSessionId ?? null,
@@ -120,21 +119,11 @@ export async function ordersRoutes(
         items: built.items,
       };
 
-      try {
-        const order = await ordersRepo.create(newOrder);
-        await cache.del(statsKey(cafeId));
-        return reply.status(201).send({ order });
-      } catch (err) {
-        const errCode = (err as { code?: string } | null)?.code;
-        if (errCode === '23505') {
-          // Unique violation on order_number — retry with new number once.
-          newOrder.orderNumber = generateOrderNumber();
-          const order = await ordersRepo.create(newOrder);
-          await cache.del(statsKey(cafeId));
-          return reply.status(201).send({ order });
-        }
-        throw err;
-      }
+      // The bill number is a gapless serial allocated atomically inside the
+      // create() transaction — no client-side number, no retry-on-collision.
+      const order = await ordersRepo.create(newOrder);
+      await cache.del(statsKey(cafeId));
+      return reply.status(201).send({ order });
     },
   );
 

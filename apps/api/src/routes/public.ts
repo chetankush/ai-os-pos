@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { askWaiter } from '../ai/waiter.js';
 import { cacheKey, getCache } from '../lib/cache.js';
-import { OrderBuildError, buildOrder, generateOrderNumber } from '../orders/build.js';
+import { OrderBuildError, buildOrder } from '../orders/build.js';
 import { createDrizzleCafesRepo, type CafesRepository } from '../repositories/cafes.js';
 import { createDrizzleMenuRepo, type MenuRepository } from '../repositories/menu.js';
 import { createDrizzleOrdersRepo, type NewOrder, type OrdersRepository } from '../repositories/orders.js';
@@ -118,7 +118,6 @@ export async function publicRoutes(
 
     const newOrder: NewOrder = {
       cafeId: cafe.id,
-      orderNumber: generateOrderNumber(),
       source: 'qr',
       tableLabel: body.tableLabel ?? null,
       tableSessionId: null,
@@ -132,18 +131,9 @@ export async function publicRoutes(
       items: built.items,
     };
 
-    const create = async () => ordersRepo.create(newOrder);
-    let order;
-    try {
-      order = await create();
-    } catch (err) {
-      if ((err as { code?: string } | null)?.code === '23505') {
-        newOrder.orderNumber = generateOrderNumber();
-        order = await create();
-      } else {
-        throw err;
-      }
-    }
+    // The bill number is a gapless serial allocated atomically inside the
+    // create() transaction — no client-side number, no retry-on-collision.
+    const order = await ordersRepo.create(newOrder);
     await cache.del(cacheKey('orders', cafe.id, 'stats', 'today'));
 
     // Public confirmation — only what the diner needs (matches PublicOrder).

@@ -1,4 +1,4 @@
-import type { CafesListResponse } from '@sangam/types';
+import type { CafesListResponse, GstMode } from '@sangam/types';
 import Link from 'next/link';
 import { ArrowRight, Plus, Store } from 'lucide-react';
 import { buttonClasses } from '@/components/ui/button';
@@ -7,6 +7,20 @@ import { Stagger, StaggerItem } from '@/components/ui/motion';
 import { serverFetch } from '@/lib/api-server';
 
 export const metadata = { title: 'Your cafes · Sangam' };
+
+// Short GST badge label from the cafe's declared mode (Sept-2025 reform).
+function gstBadge(mode: GstMode): string {
+  switch (mode) {
+    case 'regular_18':
+      return '18% GST';
+    case 'regular_5':
+      return '5% GST';
+    case 'composition':
+      return 'Composition · no GST';
+    case 'exempt':
+      return 'GST exempt';
+  }
+}
 
 export default async function CafesPage() {
   const { cafes } = await serverFetch<CafesListResponse>('/cafes');
@@ -51,9 +65,7 @@ export default async function CafesPage() {
                   <div className="mt-4 pt-4 border-t border-border flex items-center gap-4 text-[11px] text-muted">
                     <span className="font-mono">/{cafe.slug}</span>
                     <span>·</span>
-                    <span>
-                      {cafe.isAirConditioned ? '18% GST' : '5% GST'}
-                    </span>
+                    <span>{gstBadge(cafe.gstMode)}</span>
                   </div>
                 </Card>
               </Link>

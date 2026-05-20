@@ -4,6 +4,7 @@
 
 import type {
   Cafe,
+  GstMode,
   MenuCategory,
   MenuCategoryWithItems,
   MenuItem,
@@ -53,6 +54,7 @@ export interface CreateCafeRequest {
   state: string;
   pincode: string;
   isAirConditioned?: boolean;
+  gstMode?: GstMode;
   primaryColor?: string;
   logoUrl?: string;
 }
@@ -67,6 +69,7 @@ export interface UpdateCafeRequest {
   state?: string;
   pincode?: string;
   isAirConditioned?: boolean;
+  gstMode?: GstMode;
   primaryColor?: string | null;
   logoUrl?: string | null;
   onlinePaymentEnabled?: boolean;

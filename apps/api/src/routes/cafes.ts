@@ -32,6 +32,7 @@ const createCafeBodySchema = z.object({
     .trim()
     .regex(/^\d{6}$/, 'pincode must be 6 digits'),
   isAirConditioned: z.boolean().optional(),
+  gstMode: z.enum(['regular_5', 'regular_18', 'composition', 'exempt']).optional(),
   primaryColor: z
     .string()
     .trim()
@@ -51,6 +52,7 @@ const updateCafeBodySchema = z
     state: z.string().trim().min(1).max(80),
     pincode: z.string().trim().regex(/^\d{6}$/, 'pincode must be 6 digits'),
     isAirConditioned: z.boolean(),
+    gstMode: z.enum(['regular_5', 'regular_18', 'composition', 'exempt']),
     primaryColor: z
       .string()
       .trim()
@@ -110,6 +112,7 @@ export async function cafesRoutes(
       state: body.state,
       pincode: body.pincode,
       isAirConditioned: body.isAirConditioned ?? false,
+      gstMode: body.gstMode ?? 'regular_5',
       primaryColor: body.primaryColor ?? null,
       logoUrl: body.logoUrl ?? null,
     };
