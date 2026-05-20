@@ -34,6 +34,7 @@ function makeCafe(overrides: Partial<Cafe> = {}): Cafe {
     state: 'UP',
     pincode: '201301',
     isAirConditioned: false,
+    gstMode: 'regular_5',
     primaryColor: null,
     logoUrl: null,
     onlinePaymentEnabled: false,
@@ -80,7 +81,7 @@ function makeOrderWithItems(overrides: Partial<OrderWithItems> = {}): OrderWithI
   return {
     id: ORDER_ID,
     cafeId: CAFE_ID,
-    orderNumber: 'S-AAA111',
+    orderNumber: 'INV/2026-27/000001',
     status: 'ready',
     source: 'counter',
     tableLabel: null,

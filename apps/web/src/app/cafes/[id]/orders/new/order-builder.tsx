@@ -130,7 +130,10 @@ export function OrderBuilder({
     () => cartLines.reduce((s, l) => s + l.menuItem.basePricePaise * l.quantity, 0),
     [cartLines],
   );
-  const gstRateBp = cafe.isAirConditioned ? 1800 : 500;
+  // GST rate is driven by the cafe's declared mode (Sept-2025 reform), not AC.
+  // Composition dealers and exempt cafes charge no GST on the bill.
+  const gstRateBp =
+    cafe.gstMode === 'regular_18' ? 1800 : cafe.gstMode === 'regular_5' ? 500 : 0;
   const taxPaise = Math.round((subtotalPaise * gstRateBp) / 10000);
   const totalPaise = subtotalPaise + taxPaise;
 
@@ -640,11 +643,13 @@ function CartPanel(props: CartPanelProps) {
       {/* Totals */}
       <div className="space-y-1.5 border-t border-border pt-3">
         <Row label="Subtotal" value={formatRupees(subtotalPaise)} muted />
-        <Row
-          label={`GST (${(gstRateBp / 100).toFixed(0)}%)`}
-          value={formatRupees(taxPaise)}
-          muted
-        />
+        {gstRateBp > 0 && (
+          <Row
+            label={`GST (${(gstRateBp / 100).toFixed(0)}%)`}
+            value={formatRupees(taxPaise)}
+            muted
+          />
+        )}
         <div className="flex items-baseline justify-between border-t border-border pt-2">
           <span className="text-sm font-semibold">Total</span>
           <span className="text-lg font-semibold tabular-nums">

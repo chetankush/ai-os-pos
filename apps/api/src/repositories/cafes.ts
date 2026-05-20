@@ -1,5 +1,5 @@
 import { schema, type Database } from '@sangam/db';
-import type { Cafe } from '@sangam/types';
+import type { Cafe, GstMode } from '@sangam/types';
 import { and, desc, eq } from 'drizzle-orm';
 
 export interface NewCafe {
@@ -14,6 +14,7 @@ export interface NewCafe {
   state: string;
   pincode: string;
   isAirConditioned: boolean;
+  gstMode: GstMode;
   primaryColor: string | null;
   logoUrl: string | null;
 }
@@ -28,6 +29,7 @@ export interface UpdateCafe {
   state?: string;
   pincode?: string;
   isAirConditioned?: boolean;
+  gstMode?: GstMode;
   primaryColor?: string | null;
   logoUrl?: string | null;
   onlinePaymentEnabled?: boolean;

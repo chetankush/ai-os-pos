@@ -1,5 +1,6 @@
 import type {
   CafeResponse,
+  GstMode,
   Order,
   OrderStatsResponse,
   OrdersListResponse,
@@ -22,6 +23,21 @@ import { cn } from '@/lib/cn';
 import { StatusPill } from './orders/_components/status-pill';
 
 export const metadata = { title: 'Dashboard · Sangam' };
+
+// GST badge label from the cafe's declared mode (Sept-2025 reform — the AC
+// flag no longer drives the slab).
+function gstBadge(mode: GstMode): string {
+  switch (mode) {
+    case 'regular_18':
+      return '18% GST';
+    case 'regular_5':
+      return '5% GST';
+    case 'composition':
+      return 'Composition · no GST';
+    case 'exempt':
+      return 'GST exempt';
+  }
+}
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -82,7 +98,8 @@ export default async function CafeDashboardPage({ params }: PageProps) {
             </h1>
           </div>
           <span className="px-2.5 py-1 rounded-full text-[11px] font-medium border border-border bg-subtle text-fg whitespace-nowrap">
-            {cafe.isAirConditioned ? '18% GST · AC' : '5% GST · Non-AC'}
+            {gstBadge(cafe.gstMode)}
+            {cafe.isAirConditioned ? ' · AC' : ''}
           </span>
         </div>
       </FadeIn>

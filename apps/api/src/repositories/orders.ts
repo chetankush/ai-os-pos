@@ -9,6 +9,7 @@ import type {
   PaymentStatus,
 } from '@sangam/types';
 import { and, count, desc, eq, gte, ilike, inArray, sql, sum } from 'drizzle-orm';
+import { buildBillNumber, financialYear } from '../orders/build.js';
 
 export interface NewOrderItem {
   menuItemId: string | null;
@@ -20,7 +21,6 @@ export interface NewOrderItem {
 
 export interface NewOrder {
   cafeId: string;
-  orderNumber: string;
   source: 'counter' | 'qr' | 'phone';
   tableLabel: string | null;
   tableSessionId: string | null;
@@ -74,14 +74,29 @@ export interface OrdersRepository {
 export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
   return {
     async create(data) {
-      // Wrap order + items in a transaction so a failed line insert rolls back
-      // the order row.
+      // Wrap sequence allocation + order + items in one transaction so a failed
+      // line insert rolls back the order row (and the consumed serial).
       return db.transaction(async (tx) => {
+        // Gapless, legal invoice number (CGST Rule 46(b)): allocate the next
+        // consecutive serial for this (cafe, financial year) with an atomic
+        // upsert so concurrent terminals never duplicate or skip a number.
+        const fy = financialYear(new Date());
+        const [seqRow] = await tx
+          .insert(schema.invoiceSequences)
+          .values({ cafeId: data.cafeId, fy, lastSeq: 1 })
+          .onConflictDoUpdate({
+            target: [schema.invoiceSequences.cafeId, schema.invoiceSequences.fy],
+            set: { lastSeq: sql`${schema.invoiceSequences.lastSeq} + 1` },
+          })
+          .returning({ lastSeq: schema.invoiceSequences.lastSeq });
+        if (!seqRow) throw new Error('Failed to allocate invoice sequence');
+        const orderNumber = buildBillNumber(fy, seqRow.lastSeq);
+
         const [orderRow] = await tx
           .insert(schema.orders)
           .values({
             cafeId: data.cafeId,
-            orderNumber: data.orderNumber,
+            orderNumber,
             source: data.source,
             tableLabel: data.tableLabel,
             tableSessionId: data.tableSessionId,

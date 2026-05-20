@@ -8,7 +8,7 @@ import type {
   TableSessionDetail,
   TableWithStatus,
 } from '@sangam/types';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 
 export interface NewTableSession {
   cafeId: string;
@@ -58,7 +58,14 @@ export function createDrizzleTableSessionsRepo(db: Database): TableSessionsRepos
     const orderRows = await db
       .select()
       .from(schema.orders)
-      .where(and(eq(schema.orders.tableSessionId, sessionId), eq(schema.orders.cafeId, cafeId)))
+      .where(
+        and(
+          eq(schema.orders.tableSessionId, sessionId),
+          eq(schema.orders.cafeId, cafeId),
+          // Cancelled orders are voided — never part of the running tab / bill.
+          ne(schema.orders.status, 'cancelled'),
+        ),
+      )
       .orderBy(asc(schema.orders.createdAt));
 
     if (orderRows.length === 0) return [];
@@ -186,6 +193,8 @@ export function createDrizzleTableSessionsRepo(db: Database): TableSessionsRepos
             and(
               eq(schema.orders.cafeId, cafeId),
               inArray(schema.orders.tableSessionId, sessionIds),
+              // Cancelled orders don't count toward the live tab total/count.
+              ne(schema.orders.status, 'cancelled'),
             ),
           );
         for (const o of orderRows) {
@@ -237,7 +246,14 @@ export function createDrizzleTableSessionsRepo(db: Database): TableSessionsRepos
             paymentMethod,
             paidAt: now,
           })
-          .where(eq(schema.orders.tableSessionId, id));
+          // Settle every order on the tab EXCEPT cancelled ones — a voided
+          // order must never be charged or marked paid.
+          .where(
+            and(
+              eq(schema.orders.tableSessionId, id),
+              ne(schema.orders.status, 'cancelled'),
+            ),
+          );
 
         await tx
           .update(schema.tableSessions)

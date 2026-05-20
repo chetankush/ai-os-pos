@@ -7,6 +7,15 @@ export type CafeId = string;
 export type MenuCategoryId = string;
 export type MenuItemId = string;
 
+/**
+ * GST regime the cafe operates under — drives the rate charged on the bill.
+ *   regular_5    → 5% GST (standard restaurant service)
+ *   regular_18   → 18% GST (e.g. restaurant in a hotel, room tariff > ₹7,500)
+ *   composition  → composition dealer: NO GST on the bill (pays % on turnover)
+ *   exempt       → exempt / unregistered: NO GST on the bill
+ */
+export type GstMode = 'regular_5' | 'regular_18' | 'composition' | 'exempt';
+
 export interface Cafe {
   id: CafeId;
   ownerId: string;
@@ -19,7 +28,10 @@ export interface Cafe {
   city: string;
   state: string;
   pincode: string;
+  /** Informational only — no longer drives the GST slab (see gstMode). */
   isAirConditioned: boolean;
+  /** GST regime — determines the rate charged on the bill. */
+  gstMode: GstMode;
   primaryColor: string | null;
   logoUrl: string | null;
   onlinePaymentEnabled: boolean;

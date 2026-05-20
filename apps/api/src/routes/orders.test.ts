@@ -37,6 +37,7 @@ function makeCafe(overrides: Partial<Cafe> = {}): Cafe {
     state: 'UP',
     pincode: '201301',
     isAirConditioned: false,
+    gstMode: 'regular_5',
     primaryColor: null,
     logoUrl: null,
     onlinePaymentEnabled: false,
@@ -72,7 +73,7 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
   return {
     id: ORDER_ID,
     cafeId: CAFE_ID,
-    orderNumber: 'M-AAA111',
+    orderNumber: 'INV/2026-27/000001',
     status: 'pending',
     source: 'counter',
     tableLabel: null,
@@ -230,7 +231,11 @@ describe('orders endpoints', () => {
       expect(call?.taxPaise).toBe(1500); // 5% of 30000
       expect(call?.totalPaise).toBe(31500);
       expect(call?.items[0]?.itemNameSnapshot).toBe('Cappuccino');
-      expect(call?.orderNumber).toMatch(/^S-[A-Z0-9]{6}$/);
+      // Gapless bill number is assigned by the repo's create() transaction, so
+      // the route no longer passes an orderNumber.
+      expect(call).not.toHaveProperty('orderNumber');
+      // The mock repo returns the canonical INV/{fy}/{seq6} format.
+      expect(res.json().order.orderNumber).toMatch(/^INV\/\d{4}-\d{2}\/\d{6}$/);
     });
 
     it('rejects empty items array', async () => {
@@ -445,18 +450,15 @@ describe('orders endpoints', () => {
     });
   });
 
-  // ─── 18% GST for AC cafe ────────────────────────────────────────────────────
+  // ─── GST mode drives the rate (Sept-2025 reform, not AC) ────────────────────
 
-  describe('AC cafe uses 18% GST', () => {
-    let acApp: FastifyInstance;
-    let acRepo: ReturnType<typeof createMockOrdersRepo>;
-
-    beforeAll(async () => {
-      acApp = await buildTestApp({ SUPABASE_JWT_SECRET: JWT_SECRET });
-      acRepo = createMockOrdersRepo();
-      await acApp.register(ordersRoutes, {
-        repository: acRepo,
-        cafesRepository: createMockCafesRepo(makeCafe({ isAirConditioned: true })),
+  describe('GST mode drives the rate', () => {
+    async function buildAppForMode(gstMode: Cafe['gstMode']) {
+      const app = await buildTestApp({ SUPABASE_JWT_SECRET: JWT_SECRET });
+      const repo = createMockOrdersRepo();
+      await app.register(ordersRoutes, {
+        repository: repo,
+        cafesRepository: createMockCafesRepo(makeCafe({ gstMode })),
         menuRepository: createMockMenuRepo([
           {
             id: 'cat-1',
@@ -470,15 +472,13 @@ describe('orders endpoints', () => {
           },
         ]),
       });
-      await acApp.ready();
-    });
+      await app.ready();
+      return { app, repo };
+    }
 
-    afterAll(async () => {
-      await acApp.close();
-    });
-
-    it('calculates 18% tax', async () => {
-      acRepo.create.mockResolvedValueOnce(makeOrderWithItems({ gstRateBp: 1800 }));
+    it('regular_18 calculates 18% tax', async () => {
+      const { app: acApp, repo } = await buildAppForMode('regular_18');
+      repo.create.mockResolvedValueOnce(makeOrderWithItems({ gstRateBp: 1800 }));
 
       await acApp.inject({
         method: 'POST',
@@ -487,9 +487,45 @@ describe('orders endpoints', () => {
         payload: { items: [{ menuItemId: ITEM_ID, quantity: 1 }] },
       });
 
-      const call = acRepo.create.mock.calls[0]?.[0];
+      const call = repo.create.mock.calls[0]?.[0];
       expect(call?.gstRateBp).toBe(1800);
       expect(call?.taxPaise).toBe(2700); // 18% of 15000
+      await acApp.close();
+    });
+
+    it('composition charges no GST on the bill', async () => {
+      const { app: compApp, repo } = await buildAppForMode('composition');
+      repo.create.mockResolvedValueOnce(makeOrderWithItems({ gstRateBp: 0, taxPaise: 0, totalPaise: 15000 }));
+
+      await compApp.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/orders`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { items: [{ menuItemId: ITEM_ID, quantity: 1 }] },
+      });
+
+      const call = repo.create.mock.calls[0]?.[0];
+      expect(call?.gstRateBp).toBe(0);
+      expect(call?.taxPaise).toBe(0);
+      expect(call?.totalPaise).toBe(15000);
+      await compApp.close();
+    });
+
+    it('exempt charges no GST on the bill', async () => {
+      const { app: exApp, repo } = await buildAppForMode('exempt');
+      repo.create.mockResolvedValueOnce(makeOrderWithItems({ gstRateBp: 0, taxPaise: 0, totalPaise: 15000 }));
+
+      await exApp.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/orders`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { items: [{ menuItemId: ITEM_ID, quantity: 1 }] },
+      });
+
+      const call = repo.create.mock.calls[0]?.[0];
+      expect(call?.gstRateBp).toBe(0);
+      expect(call?.taxPaise).toBe(0);
+      await exApp.close();
     });
   });
 });
