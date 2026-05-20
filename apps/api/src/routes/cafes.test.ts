@@ -36,6 +36,7 @@ function createMockRepo() {
     create: vi.fn<(data: NewCafe) => Promise<Cafe>>(),
     listByOwner: vi.fn<(ownerId: string) => Promise<Cafe[]>>(),
     findByIdAndOwner: vi.fn<(id: string, ownerId: string) => Promise<Cafe | null>>(),
+    update: vi.fn<(id: string, ownerId: string, patch: object) => Promise<Cafe | null>>(),
   } satisfies CafesRepository;
 }
 
@@ -69,6 +70,7 @@ describe('cafes endpoints', () => {
     repo.create.mockReset();
     repo.listByOwner.mockReset();
     repo.findByIdAndOwner.mockReset();
+    repo.update.mockReset();
   });
 
   // ─── POST /cafes ────────────────────────────────────────────────────────────
@@ -336,6 +338,75 @@ describe('cafes endpoints', () => {
 
       expect(response.statusCode).toBe(400);
       expect(repo.findByIdAndOwner).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── PATCH /cafes/:id ─────────────────────────────────────────────────────────
+
+  describe('PATCH /cafes/:id', () => {
+    const validId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+    it('updates the cafe and returns it', async () => {
+      const updated = makeCafe({ name: 'Renamed Cafe', logoUrl: 'https://x.test/logo.png' });
+      repo.update.mockResolvedValue(updated);
+
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/cafes/${validId}`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { name: 'Renamed Cafe', logoUrl: 'https://x.test/logo.png' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().cafe.name).toBe('Renamed Cafe');
+      expect(repo.update).toHaveBeenCalledWith(
+        validId,
+        OWNER_ID,
+        expect.objectContaining({ name: 'Renamed Cafe' }),
+      );
+    });
+
+    it('scopes the update to the authenticated owner', async () => {
+      repo.update.mockResolvedValue(null); // not owned → repo returns null
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/cafes/${validId}`,
+        headers: { authorization: `Bearer ${otherToken}` },
+        payload: { name: 'Hijack' },
+      });
+      expect(response.statusCode).toBe(404);
+      expect(repo.update).toHaveBeenCalledWith(validId, OTHER_ID, expect.any(Object));
+    });
+
+    it('allows clearing optional fields with null', async () => {
+      repo.update.mockResolvedValue(makeCafe({ gstin: null }));
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/cafes/${validId}`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { gstin: null },
+      });
+      expect(response.statusCode).toBe(200);
+    });
+
+    it('rejects an invalid pincode', async () => {
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/cafes/${validId}`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { pincode: '12' },
+      });
+      expect(response.statusCode).toBe(400);
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it('requires authentication', async () => {
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/cafes/${validId}`,
+        payload: { name: 'X' },
+      });
+      expect(response.statusCode).toBe(401);
     });
   });
 });

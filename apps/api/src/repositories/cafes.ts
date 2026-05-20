@@ -18,10 +18,25 @@ export interface NewCafe {
   logoUrl: string | null;
 }
 
+export interface UpdateCafe {
+  name?: string;
+  gstin?: string | null;
+  fssai?: string | null;
+  addressLine1?: string;
+  addressLine2?: string | null;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  isAirConditioned?: boolean;
+  primaryColor?: string | null;
+  logoUrl?: string | null;
+}
+
 export interface CafesRepository {
   create(data: NewCafe): Promise<Cafe>;
   listByOwner(ownerId: string): Promise<Cafe[]>;
   findByIdAndOwner(id: string, ownerId: string): Promise<Cafe | null>;
+  update(id: string, ownerId: string, patch: UpdateCafe): Promise<Cafe | null>;
 }
 
 export function createDrizzleCafesRepo(db: Database): CafesRepository {
@@ -46,6 +61,15 @@ export function createDrizzleCafesRepo(db: Database): CafesRepository {
         .from(schema.cafes)
         .where(and(eq(schema.cafes.id, id), eq(schema.cafes.ownerId, ownerId)))
         .limit(1);
+      return row ?? null;
+    },
+
+    async update(id, ownerId, patch) {
+      const [row] = await db
+        .update(schema.cafes)
+        .set(patch)
+        .where(and(eq(schema.cafes.id, id), eq(schema.cafes.ownerId, ownerId)))
+        .returning();
       return row ?? null;
     },
   };

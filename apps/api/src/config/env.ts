@@ -10,6 +10,8 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url().optional(),
   // Legacy HS256 shared secret — used for HS256 tokens (tests / older projects).
   SUPABASE_JWT_SECRET: z.string().min(1).optional(),
+  // Service (secret) key — server-side only; used to upload to Supabase Storage.
+  SUPABASE_SECRET_KEY: z.string().min(1).optional(),
   CORS_ORIGINS: z
     .string()
     .default('http://localhost:3000')

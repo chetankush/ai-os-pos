@@ -40,6 +40,26 @@ const createCafeBodySchema = z.object({
   logoUrl: z.string().trim().url().optional(),
 });
 
+const updateCafeBodySchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    gstin: z.string().trim().length(15).nullable(),
+    fssai: z.string().trim().min(7).max(14).nullable(),
+    addressLine1: z.string().trim().min(1).max(200),
+    addressLine2: z.string().trim().max(200).nullable(),
+    city: z.string().trim().min(1).max(80),
+    state: z.string().trim().min(1).max(80),
+    pincode: z.string().trim().regex(/^\d{6}$/, 'pincode must be 6 digits'),
+    isAirConditioned: z.boolean(),
+    primaryColor: z
+      .string()
+      .trim()
+      .regex(/^#[0-9a-fA-F]{6}$/, 'primaryColor must be a hex color like #ff8800')
+      .nullable(),
+    logoUrl: z.string().trim().url().nullable(),
+  })
+  .partial();
+
 const cafeParamsSchema = z.object({
   id: z.string().uuid(),
 });
@@ -120,6 +140,20 @@ export async function cafesRoutes(
     const { id } = cafeParamsSchema.parse(request.params);
     const cafe = await repo.findByIdAndOwner(id, request.user.id);
 
+    if (!cafe) {
+      return reply.status(404).send({
+        error: { code: 'NOT_FOUND', message: 'Cafe not found' },
+      });
+    }
+
+    return { cafe };
+  });
+
+  app.patch('/cafes/:id', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = cafeParamsSchema.parse(request.params);
+    const patch = updateCafeBodySchema.parse(request.body);
+
+    const cafe = await repo.update(id, request.user.id, patch);
     if (!cafe) {
       return reply.status(404).send({
         error: { code: 'NOT_FOUND', message: 'Cafe not found' },

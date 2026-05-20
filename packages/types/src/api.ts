@@ -49,6 +49,20 @@ export interface CreateCafeRequest {
   logoUrl?: string;
 }
 
+export interface UpdateCafeRequest {
+  name?: string;
+  gstin?: string | null;
+  fssai?: string | null;
+  addressLine1?: string;
+  addressLine2?: string | null;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  isAirConditioned?: boolean;
+  primaryColor?: string | null;
+  logoUrl?: string | null;
+}
+
 export interface CafesListResponse {
   cafes: Cafe[];
 }

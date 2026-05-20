@@ -4,6 +4,7 @@ import { healthRoutes } from './health.js';
 import { menuRoutes } from './menu.js';
 import { ordersRoutes } from './orders.js';
 import { settleRoutes } from './settle.js';
+import { uploadsRoutes } from './uploads.js';
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(healthRoutes);
@@ -19,10 +20,11 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     );
   }
 
-  // Settle only needs auth (it analyzes an uploaded statement, no DB).
+  // Settle + uploads only need auth (no DB).
   if (app.hasDecorator('authenticate')) {
     await app.register(settleRoutes);
+    await app.register(uploadsRoutes);
   } else {
-    app.log.warn('settle routes not registered — requires SUPABASE_JWT_SECRET');
+    app.log.warn('settle/uploads routes not registered — requires auth');
   }
 }

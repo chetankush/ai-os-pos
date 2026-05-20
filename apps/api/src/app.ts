@@ -1,4 +1,5 @@
 import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -37,6 +38,9 @@ export async function buildApp(env: Env): Promise<FastifyInstance> {
   await app.register(cors, {
     origin: env.CORS_ORIGINS,
     credentials: true,
+  });
+  await app.register(multipart, {
+    limits: { fileSize: 5 * 1024 * 1024, files: 1 }, // 5 MB, single image
   });
   await app.register(rateLimit, {
     // Key authenticated requests by their bearer token, not IP — multiple

@@ -183,9 +183,12 @@ export default async function CafeDashboardPage({ params }: PageProps) {
         <Card>
           <CardHeader className="flex items-center justify-between gap-4">
             <CardTitle>Cafe info</CardTitle>
-            <span className="text-[10px] uppercase tracking-wider text-muted font-medium px-2 py-0.5 rounded-full border border-border">
-              Edit · soon
-            </span>
+            <Link
+              href={`/cafes/${cafe.id}/edit`}
+              className={buttonClasses({ variant: 'secondary', size: 'sm' })}
+            >
+              Edit
+            </Link>
           </CardHeader>
           <CardBody>
             <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
