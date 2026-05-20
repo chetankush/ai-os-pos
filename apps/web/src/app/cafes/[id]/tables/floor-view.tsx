@@ -5,7 +5,7 @@ import type {
   TableLiveStatus,
   TableWithStatus,
 } from '@sangam/types';
-import { LayoutGrid } from 'lucide-react';
+import { LayoutGrid, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -28,9 +28,17 @@ type SheetState =
 
 const UNGROUPED = '__ungrouped__';
 
+// Logical floor-plan space — must match the layout editor so saved x/y line up.
+const CANVAS_W = 1000;
+const CANVAS_H = 640;
+const CHIP = 88;
+
+type ViewMode = 'room' | 'grid';
+
 export function FloorView({ cafeId, initialFloor }: Props) {
   const [tables, setTables] = useState(initialFloor.tables);
   const [sheet, setSheet] = useState<SheetState>({ kind: 'none' });
+  const [view, setView] = useState<ViewMode>('room');
 
   const refreshFloor = useCallback(async () => {
     try {
@@ -99,25 +107,34 @@ export function FloorView({ cafeId, initialFloor }: Props) {
   }
 
   return (
-    <div className="space-y-8">
-      <Legend />
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Legend />
+        <ViewToggle view={view} onChange={setView} />
+      </div>
 
-      {groups.map(([area, areaTables]) => (
-        <section key={area} className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
-            {area === UNGROUPED ? 'Tables' : area}
-          </h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {areaTables.map((table) => (
-              <TableCard
-                key={table.id}
-                table={table}
-                onTap={() => handleTap(table)}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
+      {view === 'room' ? (
+        <RoomCanvas tables={tables} onTap={handleTap} />
+      ) : (
+        <div className="space-y-8">
+          {groups.map(([area, areaTables]) => (
+            <section key={area} className="space-y-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
+                {area === UNGROUPED ? 'Tables' : area}
+              </h2>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {areaTables.map((table) => (
+                  <TableCard
+                    key={table.id}
+                    table={table}
+                    onTap={() => handleTap(table)}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
 
       {sheet.kind === 'open' && (
         <OpenSessionSheet
@@ -144,6 +161,121 @@ export function FloorView({ cafeId, initialFloor }: Props) {
         />
       )}
     </div>
+  );
+}
+
+// ─── Room / Grid view toggle ────────────────────────────────────────────────
+
+function ViewToggle({
+  view,
+  onChange,
+}: {
+  view: ViewMode;
+  onChange: (v: ViewMode) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Floor view"
+      className="inline-flex rounded-lg border border-border bg-subtle p-0.5"
+    >
+      {(['room', 'grid'] as const).map((v) => (
+        <button
+          key={v}
+          type="button"
+          aria-pressed={view === v}
+          onClick={() => onChange(v)}
+          className={cn(
+            'min-h-8 rounded-md px-3 text-xs font-medium transition-all duration-150',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg',
+            view === v ? 'bg-bg text-fg shadow-sm' : 'text-muted hover:text-fg',
+          )}
+        >
+          {v === 'room' ? 'Room' : 'Grid'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Room view (spatial floor plan, live status) ─────────────────────────────
+
+function RoomCanvas({
+  tables,
+  onTap,
+}: {
+  tables: TableWithStatus[];
+  onTap: (table: TableWithStatus) => void;
+}) {
+  return (
+    <div
+      className={cn(
+        'relative w-full overflow-hidden rounded-xl border border-border bg-subtle/40',
+        // faint plan grid so positions read as a room, not a void
+        '[background-image:linear-gradient(to_right,var(--color-border)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-border)_1px,transparent_1px)]',
+        '[background-size:40px_40px] [background-position:-1px_-1px]',
+      )}
+      style={{ aspectRatio: `${CANVAS_W} / ${CANVAS_H}` }}
+    >
+      {tables.map((table) => (
+        <RoomChip key={table.id} table={table} onTap={() => onTap(table)} />
+      ))}
+    </div>
+  );
+}
+
+function RoomChip({
+  table,
+  onTap,
+}: {
+  table: TableWithStatus;
+  onTap: () => void;
+}) {
+  const style = LIVE_STATUS[table.liveStatus];
+  const { Icon } = style;
+  const active = table.liveStatus !== 'free' && table.session;
+  const isRound = table.shape === 'round';
+
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      aria-label={`Table ${table.label} — ${style.label}`}
+      className={cn(
+        'absolute flex flex-col items-center justify-center gap-0.5 border p-1 text-center',
+        'transition-all duration-150 active:scale-[0.97] touch-manipulation',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
+        isRound ? 'rounded-full' : 'rounded-xl',
+        style.card,
+      )}
+      style={{
+        left: `${(table.x / CANVAS_W) * 100}%`,
+        top: `${(table.y / CANVAS_H) * 100}%`,
+        width: `${(CHIP / CANVAS_W) * 100}%`,
+        height: `${(CHIP / CANVAS_H) * 100}%`,
+      }}
+    >
+      <span
+        className={cn(
+          'absolute right-1 top-1 grid size-4 place-items-center rounded-full border',
+          style.chip,
+        )}
+      >
+        <Icon className="size-2.5" aria-hidden="true" />
+      </span>
+
+      <span className="text-sm font-semibold leading-none">{table.label}</span>
+      {active && table.session ? (
+        <span className="text-[11px] font-semibold tabular-nums leading-none">
+          {formatRupees(table.runningTotalPaise)}
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-0.5 text-[10px] text-muted leading-none">
+          <Users className="size-2.5" aria-hidden="true" />
+          {table.seats}
+        </span>
+      )}
+    </button>
   );
 }
 

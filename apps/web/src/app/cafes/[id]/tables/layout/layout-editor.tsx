@@ -114,7 +114,11 @@ export function LayoutEditor({ cafeId, slug, cafeName, initialTables }: Props) {
       try {
         await authedFetch(`/cafes/${cafeId}/tables/${id}`, {
           method: 'PATCH',
-          body: JSON.stringify({ x, y } satisfies UpdateTableRequest),
+          // Drag math yields fractional px; the API stores integer coords.
+          body: JSON.stringify({
+            x: Math.round(x),
+            y: Math.round(y),
+          } satisfies UpdateTableRequest),
         });
       } catch (err) {
         patchLocal(id, { x: prevX, y: prevY });
@@ -433,13 +437,15 @@ function TableChip({
           : 'border-border',
       )}
       style={{
-        // transform-only positioning keeps drags off the layout/reflow path.
-        width: CHIP,
-        height: CHIP,
-        transform: `translate(${table.x}px, ${table.y}px)`,
-        left: 0,
-        top: 0,
-        // disable transform-transition while dragging for 1:1 finger tracking
+        // Position + size as a percentage of the canvas's logical 1000x640 space
+        // so a chip scales with the rendered canvas. This keeps the logical clamp
+        // (0..CANVAS_W-CHIP) aligned with the *visible* bounds on any screen width,
+        // so a table can never be dragged off-canvas and lost under overflow-hidden.
+        left: `${(table.x / CANVAS_W) * 100}%`,
+        top: `${(table.y / CANVAS_H) * 100}%`,
+        width: `${(CHIP / CANVAS_W) * 100}%`,
+        height: `${(CHIP / CANVAS_H) * 100}%`,
+        // disable position transition while dragging for 1:1 finger tracking
         transitionProperty: dragging ? 'box-shadow' : undefined,
       }}
       {...handlers}
