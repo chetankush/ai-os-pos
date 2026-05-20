@@ -76,6 +76,7 @@ function makeItem(overrides: Partial<MenuItem> = {}): MenuItem {
 function createMockMenuRepo() {
   return {
     getFullMenu: vi.fn(),
+    categoryExists: vi.fn<(categoryId: string, cafeId: string) => Promise<boolean>>(),
     createCategory: vi.fn<(d: NewMenuCategory) => Promise<MenuCategory>>(),
     createItem: vi.fn<(d: NewMenuItem) => Promise<MenuItem>>(),
     updateItem: vi.fn<(id: string, cafeId: string, p: UpdateMenuItem) => Promise<MenuItem | null>>(),
@@ -106,8 +107,8 @@ describe('menu endpoints', () => {
     });
     await app.ready();
 
-    ownerToken = app.jwt.sign({ sub: OWNER_ID, email: 'owner@test.in' }, { expiresIn: '1h' });
-    otherToken = app.jwt.sign({ sub: OTHER_ID, email: 'other@test.in' }, { expiresIn: '1h' });
+    ownerToken = app.jwt.sign({ sub: OWNER_ID, email: 'owner@test.in', aud: 'authenticated' }, { expiresIn: '1h' });
+    otherToken = app.jwt.sign({ sub: OTHER_ID, email: 'other@test.in', aud: 'authenticated' }, { expiresIn: '1h' });
   });
 
   afterAll(async () => {
@@ -116,6 +117,9 @@ describe('menu endpoints', () => {
 
   beforeEach(() => {
     menuRepo.getFullMenu.mockReset();
+    menuRepo.categoryExists.mockReset();
+    // Default: the category belongs to the cafe (valid). Tests override to false.
+    menuRepo.categoryExists.mockResolvedValue(true);
     menuRepo.createCategory.mockReset();
     menuRepo.createItem.mockReset();
     menuRepo.updateItem.mockReset();
@@ -197,6 +201,21 @@ describe('menu endpoints', () => {
   // ─── POST /cafes/:cafeId/menu/items ─────────────────────────────────────────
 
   describe('POST /cafes/:cafeId/menu/items', () => {
+    it('rejects an item whose category does not belong to the cafe', async () => {
+      menuRepo.categoryExists.mockResolvedValueOnce(false); // foreign/orphan category
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/menu/items`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { categoryId: CAT_ID, name: 'Cappuccino', basePricePaise: 15000 },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error.code).toBe('INVALID_CATEGORY');
+      expect(menuRepo.createItem).not.toHaveBeenCalled();
+    });
+
     it('creates an item with sensible defaults', async () => {
       menuRepo.createItem.mockResolvedValueOnce(makeItem());
 

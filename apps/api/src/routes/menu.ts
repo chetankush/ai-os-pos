@@ -133,6 +133,18 @@ export async function menuRoutes(
       }
 
       const body = createItemBodySchema.parse(request.body);
+
+      // The DB FK only proves the category exists globally — verify it belongs
+      // to THIS cafe, else the item is silently orphaned (or cross-tenant).
+      if (!(await menuRepo.categoryExists(body.categoryId, cafeId))) {
+        return reply.status(400).send({
+          error: {
+            code: 'INVALID_CATEGORY',
+            message: 'Category does not belong to this cafe',
+          },
+        });
+      }
+
       const newItem: NewMenuItem = {
         cafeId,
         categoryId: body.categoryId,
@@ -166,6 +178,18 @@ export async function menuRoutes(
       }
 
       const patch = updateItemBodySchema.parse(request.body);
+
+      // If the patch moves the item to another category, that category must
+      // also belong to this cafe.
+      if (patch.categoryId && !(await menuRepo.categoryExists(patch.categoryId, cafeId))) {
+        return reply.status(400).send({
+          error: {
+            code: 'INVALID_CATEGORY',
+            message: 'Category does not belong to this cafe',
+          },
+        });
+      }
+
       const item = await menuRepo.updateItem(itemId, cafeId, patch);
 
       if (!item) {

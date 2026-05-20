@@ -3,7 +3,7 @@
 import type { CreateCafeRequest } from '@mehfil/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button, buttonClasses } from '@/components/ui/button';
 import { Card, CardBody, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field } from '@/components/ui/label';
@@ -19,26 +19,103 @@ const INITIAL: CreateCafeRequest = {
   pincode: '',
 };
 
+// Subtle "*" marker for required fields. aria-hidden because requiredness is
+// already conveyed via the input's required/aria-required attributes.
+const RequiredMark = () => (
+  <span className="text-danger" aria-hidden="true">
+    {' '}
+    *
+  </span>
+);
+
+// Fields that can carry a validation error, in DOM/visual order so we can focus
+// the first invalid one.
+type ErrorField = 'name' | 'addressLine1' | 'city' | 'state' | 'pincode' | 'gstin';
+const FIELD_ORDER: ErrorField[] = [
+  'name',
+  'addressLine1',
+  'city',
+  'state',
+  'pincode',
+  'gstin',
+];
+
+type FieldErrors = Partial<Record<ErrorField, string>>;
+
+const PINCODE_RE = /^\d{6}$/;
+
+function validate(form: CreateCafeRequest): FieldErrors {
+  const errors: FieldErrors = {};
+
+  if (!form.name.trim()) errors.name = 'Enter the cafe name.';
+  if (!form.addressLine1.trim()) errors.addressLine1 = 'Enter the street address.';
+  if (!form.city.trim()) errors.city = 'Enter the city.';
+  if (!form.state.trim()) errors.state = 'Enter the state.';
+
+  if (!form.pincode.trim()) {
+    errors.pincode = 'Enter the pincode.';
+  } else if (!PINCODE_RE.test(form.pincode.trim())) {
+    errors.pincode = 'Pincode must be exactly 6 digits.';
+  }
+
+  // GSTIN is optional, but if present it must be 15 characters.
+  const gstin = form.gstin?.trim();
+  if (gstin && gstin.length !== 15) {
+    errors.gstin = 'GSTIN must be 15 characters.';
+  }
+
+  return errors;
+}
+
 export function NewCafeForm() {
   const router = useRouter();
   const [form, setForm] = useState<CreateCafeRequest>(INITIAL);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Per-field validation errors render next to each input.
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  // Form-level error is reserved for server/network/session failures only.
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // One ref per validatable field so we can focus the first invalid one.
+  const refs: Record<ErrorField, React.RefObject<HTMLInputElement | null>> = {
+    name: useRef<HTMLInputElement>(null),
+    addressLine1: useRef<HTMLInputElement>(null),
+    city: useRef<HTMLInputElement>(null),
+    state: useRef<HTMLInputElement>(null),
+    pincode: useRef<HTMLInputElement>(null),
+    gstin: useRef<HTMLInputElement>(null),
+  };
 
   function update<K extends keyof CreateCafeRequest>(key: K, value: CreateCafeRequest[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    // Clear this field's error as soon as the user edits it.
+    if (key in fieldErrors) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[key as ErrorField];
+        return next;
+      });
+    }
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
+    setFormError(null);
+
+    const errors = validate(form);
+    setFieldErrors(errors);
+    const firstInvalid = FIELD_ORDER.find((f) => errors[f]);
+    if (firstInvalid) {
+      refs[firstInvalid].current?.focus();
+      return;
+    }
 
     const supabase = createSupabaseBrowserClient();
     const {
       data: { session },
     } = await supabase.auth.getSession();
     if (!session) {
-      setError('Session expired. Please sign in again.');
+      setFormError('Session expired. Please sign in again.');
       return;
     }
 
@@ -48,23 +125,35 @@ export function NewCafeForm() {
       router.push(`/cafes/${cafe.id}`);
       router.refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to create cafe');
+      setFormError(err instanceof ApiError ? err.message : 'Failed to create cafe');
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} noValidate>
       <Card>
         <CardHeader>
           <CardTitle>Cafe details</CardTitle>
         </CardHeader>
         <CardBody className="space-y-5">
-          <Field label="Cafe name" htmlFor="name">
+          <Field
+            label={
+              <>
+                Cafe name
+                <RequiredMark />
+              </>
+            }
+            htmlFor="name"
+            error={fieldErrors.name}
+          >
             <Input
               id="name"
+              ref={refs.name}
               required
+              aria-required="true"
+              aria-invalid={fieldErrors.name ? true : undefined}
               maxLength={120}
               value={form.name}
               onChange={(e) => update('name', e.target.value)}
@@ -72,10 +161,22 @@ export function NewCafeForm() {
             />
           </Field>
 
-          <Field label="Address line 1" htmlFor="addr1">
+          <Field
+            label={
+              <>
+                Address line 1
+                <RequiredMark />
+              </>
+            }
+            htmlFor="addr1"
+            error={fieldErrors.addressLine1}
+          >
             <Input
               id="addr1"
+              ref={refs.addressLine1}
               required
+              aria-required="true"
+              aria-invalid={fieldErrors.addressLine1 ? true : undefined}
               maxLength={200}
               value={form.addressLine1}
               onChange={(e) => update('addressLine1', e.target.value)}
@@ -93,20 +194,44 @@ export function NewCafeForm() {
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="City" htmlFor="city">
+            <Field
+              label={
+                <>
+                  City
+                  <RequiredMark />
+                </>
+              }
+              htmlFor="city"
+              error={fieldErrors.city}
+            >
               <Input
                 id="city"
+                ref={refs.city}
                 required
+                aria-required="true"
+                aria-invalid={fieldErrors.city ? true : undefined}
                 maxLength={80}
                 value={form.city}
                 onChange={(e) => update('city', e.target.value)}
                 placeholder="Noida"
               />
             </Field>
-            <Field label="State" htmlFor="state">
+            <Field
+              label={
+                <>
+                  State
+                  <RequiredMark />
+                </>
+              }
+              htmlFor="state"
+              error={fieldErrors.state}
+            >
               <Input
                 id="state"
+                ref={refs.state}
                 required
+                aria-required="true"
+                aria-invalid={fieldErrors.state ? true : undefined}
                 maxLength={80}
                 value={form.state}
                 onChange={(e) => update('state', e.target.value)}
@@ -115,10 +240,22 @@ export function NewCafeForm() {
             </Field>
           </div>
 
-          <Field label="Pincode" htmlFor="pincode">
+          <Field
+            label={
+              <>
+                Pincode
+                <RequiredMark />
+              </>
+            }
+            htmlFor="pincode"
+            error={fieldErrors.pincode}
+          >
             <Input
               id="pincode"
+              ref={refs.pincode}
               required
+              aria-required="true"
+              aria-invalid={fieldErrors.pincode ? true : undefined}
               inputMode="numeric"
               pattern="\d{6}"
               maxLength={6}
@@ -129,9 +266,16 @@ export function NewCafeForm() {
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="GSTIN" hint="Optional" htmlFor="gstin">
+            <Field
+              label="GSTIN"
+              hint={fieldErrors.gstin ? undefined : 'Optional'}
+              htmlFor="gstin"
+              error={fieldErrors.gstin}
+            >
               <Input
                 id="gstin"
+                ref={refs.gstin}
+                aria-invalid={fieldErrors.gstin ? true : undefined}
                 maxLength={15}
                 value={form.gstin ?? ''}
                 onChange={(e) => update('gstin', e.target.value || undefined)}
@@ -163,12 +307,12 @@ export function NewCafeForm() {
             </div>
           </label>
 
-          {error && (
+          {formError && (
             <p
               className="text-xs text-danger px-3 py-2 rounded-md border border-danger/20 bg-danger/5"
               role="alert"
             >
-              {error}
+              {formError}
             </p>
           )}
         </CardBody>

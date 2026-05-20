@@ -18,6 +18,7 @@ async function signTestToken(app: FastifyInstance, args: SignArgs = {}): Promise
     sub: args.sub ?? '11111111-1111-1111-1111-111111111111',
     email: args.email ?? 'nikhil@mehfil.in',
     role: args.role ?? 'authenticated',
+    aud: 'authenticated',
   };
 
   if (args.secret) {
@@ -121,6 +122,23 @@ describe('auth plugin', () => {
     expect(body.error.message).toMatch(/subject/i);
   });
 
+  it('rejects a token with the wrong audience', async () => {
+    // A non-user token (e.g. aud="anon") signed with the same secret must not
+    // be accepted as an authenticated user.
+    const token = app.jwt.sign(
+      { sub: '55555555-5555-5555-5555-555555555555', email: 'anon@x.com', aud: 'anon' },
+      { expiresIn: '1h' },
+    );
+    const response = await app.inject({
+      method: 'GET',
+      url: '/me',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(response.statusCode).toBe(401);
+    const body = response.json() as { error: { message: string } };
+    expect(body.error.message).toMatch(/audience/i);
+  });
+
   it('accepts a valid token and populates request.user', async () => {
     const token = await signTestToken(app, {
       sub: '22222222-2222-2222-2222-222222222222',
@@ -145,7 +163,7 @@ describe('auth plugin', () => {
 
   it('defaults role to "authenticated" when missing from token', async () => {
     const token = app.jwt.sign(
-      { sub: '33333333-3333-3333-3333-333333333333', email: 'r@x.com' },
+      { sub: '33333333-3333-3333-3333-333333333333', email: 'r@x.com', aud: 'authenticated' },
       { expiresIn: '1h' },
     );
 
@@ -165,6 +183,7 @@ describe('auth plugin', () => {
         sub: '44444444-4444-4444-4444-444444444444',
         email: 'staff@mehfil.in',
         role: 'staff',
+        aud: 'authenticated',
       },
       { expiresIn: '1h' },
     );

@@ -38,6 +38,8 @@ export interface UpdateMenuItem {
 
 export interface MenuRepository {
   getFullMenu(cafeId: string): Promise<MenuCategoryWithItems[]>;
+  /** True iff the category exists AND belongs to the given cafe. */
+  categoryExists(categoryId: string, cafeId: string): Promise<boolean>;
   createCategory(data: NewMenuCategory): Promise<MenuCategory>;
   createItem(data: NewMenuItem): Promise<MenuItem>;
   updateItem(
@@ -75,6 +77,20 @@ export function createDrizzleMenuRepo(db: Database): MenuRepository {
         ...cat,
         items: itemsByCategory.get(cat.id) ?? [],
       }));
+    },
+
+    async categoryExists(categoryId, cafeId) {
+      const [row] = await db
+        .select({ id: schema.menuCategories.id })
+        .from(schema.menuCategories)
+        .where(
+          and(
+            eq(schema.menuCategories.id, categoryId),
+            eq(schema.menuCategories.cafeId, cafeId),
+          ),
+        )
+        .limit(1);
+      return row != null;
     },
 
     async createCategory(data) {

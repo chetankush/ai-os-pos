@@ -52,11 +52,11 @@ describe('cafes endpoints', () => {
     await app.ready();
 
     ownerToken = app.jwt.sign(
-      { sub: OWNER_ID, email: 'owner@mehfil.in' },
+      { sub: OWNER_ID, email: 'owner@mehfil.in', aud: 'authenticated' },
       { expiresIn: '1h' },
     );
     otherToken = app.jwt.sign(
-      { sub: OTHER_ID, email: 'other@mehfil.in' },
+      { sub: OTHER_ID, email: 'other@mehfil.in', aud: 'authenticated' },
       { expiresIn: '1h' },
     );
   });

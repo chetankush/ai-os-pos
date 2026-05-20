@@ -39,8 +39,14 @@ export async function buildApp(env: Env): Promise<FastifyInstance> {
     credentials: true,
   });
   await app.register(rateLimit, {
-    max: 200,
+    // Key authenticated requests by their bearer token, not IP — multiple
+    // cafe staff behind one restaurant NAT must not share a budget (and the
+    // limiter runs before auth, so we can't use request.user here). Anonymous
+    // traffic still keys by IP. Authenticated gets a higher ceiling for the
+    // burst of order/status calls during a service rush.
+    max: (req) => (req.headers.authorization ? 600 : 100),
     timeWindow: '1 minute',
+    keyGenerator: (req) => req.headers.authorization ?? req.ip,
   });
 
   if (env.DATABASE_URL) {

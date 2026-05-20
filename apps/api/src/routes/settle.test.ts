@@ -14,7 +14,7 @@ describe('settle endpoints', () => {
     // JWT secret provides) — so we don't register it again here.
     app = await buildTestApp({ SUPABASE_JWT_SECRET: JWT_SECRET });
     await app.ready();
-    token = app.jwt.sign({ sub: OWNER_ID, email: 'owner@test.in' }, { expiresIn: '1h' });
+    token = app.jwt.sign({ sub: OWNER_ID, email: 'owner@test.in', aud: 'authenticated' }, { expiresIn: '1h' });
   });
 
   afterAll(async () => {

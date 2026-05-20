@@ -163,7 +163,7 @@ describe('orders endpoints', () => {
     });
     await app.ready();
 
-    ownerToken = app.jwt.sign({ sub: OWNER_ID, email: 'owner@test.in' }, { expiresIn: '1h' });
+    ownerToken = app.jwt.sign({ sub: OWNER_ID, email: 'owner@test.in', aud: 'authenticated' }, { expiresIn: '1h' });
   });
 
   afterAll(async () => {

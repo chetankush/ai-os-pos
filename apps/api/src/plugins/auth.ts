@@ -60,6 +60,22 @@ async function plugin(app: FastifyInstance, opts: AuthPluginOptions): Promise<vo
           });
         }
 
+        // Verify audience: Supabase issues user access tokens with
+        // aud="authenticated". Without this check, ANY HS256 token signed with
+        // the shared secret (e.g. a non-user / service token) would be accepted.
+        const aud = payload.aud;
+        const audOk =
+          aud === 'authenticated' ||
+          (Array.isArray(aud) && aud.includes('authenticated'));
+        if (!audOk) {
+          return reply.status(401).send({
+            error: {
+              code: 'UNAUTHORIZED',
+              message: 'Invalid token audience',
+            },
+          });
+        }
+
         request.user = {
           id: payload.sub,
           email: payload.email ?? null,
