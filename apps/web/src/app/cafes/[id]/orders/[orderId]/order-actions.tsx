@@ -22,6 +22,8 @@ interface Props {
   cafeId: string;
   orderId: string;
   initialStatus: OrderStatus;
+  /** Already settled online (Razorpay) — skip the "how was this paid?" picker. */
+  alreadyPaid?: boolean;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -107,7 +109,12 @@ async function patchStatus(
   return (await res.json()) as OrderResponse;
 }
 
-export function OrderActions({ cafeId, orderId, initialStatus }: Props) {
+export function OrderActions({
+  cafeId,
+  orderId,
+  initialStatus,
+  alreadyPaid = false,
+}: Props) {
   const router = useRouter();
   const [status, setStatus] = useState<OrderStatus>(initialStatus);
   const [pending, setPending] = useState<null | 'next' | 'cancel'>(null);
@@ -152,7 +159,9 @@ export function OrderActions({ cafeId, orderId, initialStatus }: Props) {
   }
 
   const nextAction = NEXT_LABEL[status];
-  const needsPayment = nextAction.status === 'completed';
+  // Only ask "how was this paid?" when completing an order that isn't already
+  // settled online — QR/Razorpay orders are paid before they reach the counter.
+  const needsPayment = nextAction.status === 'completed' && !alreadyPaid;
 
   function handleNext() {
     if (needsPayment) {

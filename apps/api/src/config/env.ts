@@ -22,6 +22,8 @@ const envSchema = z.object({
         .filter(Boolean),
     ),
   DEEPSEEK_API_KEY: z.string().optional(),
+  DEEPSEEK_MODEL: z.string().default('deepseek-chat'),
+  DEEPSEEK_BASE_URL: z.string().url().default('https://api.deepseek.com'),
   GEMINI_API_KEY: z.string().optional(),
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),

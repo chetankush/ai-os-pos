@@ -20,6 +20,10 @@ export const cafes = pgTable(
     isAirConditioned: boolean().notNull().default(false),
     primaryColor: text(),
     logoUrl: text(),
+    // QR online payments (Razorpay). Master switch + whether QR orders must be
+    // prepaid (true) or can run as a pay-later tab / pay-at-counter (false).
+    onlinePaymentEnabled: boolean().notNull().default(false),
+    qrPrepaidRequired: boolean().notNull().default(false),
     createdAt: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true, mode: 'string' })
       .notNull()

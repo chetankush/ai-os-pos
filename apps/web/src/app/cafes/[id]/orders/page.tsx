@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { FadeIn, Stagger, StaggerItem } from '@/components/ui/motion';
 import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/api-server';
+import { PaymentBadge } from './_components/payment-badge';
 import { StatusPill } from './_components/status-pill';
 
 export const metadata = { title: 'Orders · Sangam' };
@@ -88,6 +89,10 @@ function OrderRow({ cafeId, order }: { cafeId: string; order: Order }) {
                 {order.orderNumber}
               </span>
               <StatusPill status={order.status} />
+              <PaymentBadge
+                status={order.paymentStatus}
+                method={order.paymentMethod}
+              />
               {order.tableLabel ? (
                 <span className="text-[11px] text-muted px-1.5 py-0.5 rounded border border-border bg-subtle">
                   Table {order.tableLabel}

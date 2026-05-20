@@ -28,6 +28,15 @@ export type OrderSource = (typeof orderSourceValues)[number];
 export const paymentMethodValues = ['cash', 'upi', 'card', 'online'] as const;
 export type PaymentMethod = (typeof paymentMethodValues)[number];
 
+export const paymentStatusValues = [
+  'unpaid',
+  'pending',
+  'paid',
+  'failed',
+  'refunded',
+] as const;
+export type PaymentStatus = (typeof paymentStatusValues)[number];
+
 export const orders = pgTable(
   'orders',
   {
@@ -53,6 +62,14 @@ export const orders = pgTable(
 
     // How the bill was settled — recorded when the order is completed.
     paymentMethod: text({ enum: paymentMethodValues }),
+
+    // Payment lifecycle for online (Razorpay) QR orders. Counter orders stay
+    // 'unpaid' until completed-with-method, then flip to 'paid'.
+    paymentStatus: text({ enum: paymentStatusValues }).notNull().default('unpaid'),
+    // Razorpay order id (created when the diner starts payment) + payment id
+    // (set after the signature is verified). Kept for reconciliation + audit.
+    providerOrderId: text(),
+    providerPaymentId: text(),
 
     createdAt: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true, mode: 'string' })

@@ -34,6 +34,8 @@ function makeCafe(): Cafe {
     isAirConditioned: false,
     primaryColor: null,
     logoUrl: null,
+    onlinePaymentEnabled: false,
+    qrPrepaidRequired: false,
     createdAt: '2026-05-20T00:00:00.000Z',
     updatedAt: '2026-05-20T00:00:00.000Z',
   };

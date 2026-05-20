@@ -194,6 +194,24 @@ export default async function CafeDashboardPage({ params }: PageProps) {
           >
             View all orders
           </Link>
+          <Link
+            href={`/cafes/${cafe.id}/tables`}
+            className={buttonClasses({ variant: 'secondary' })}
+          >
+            Tables &amp; QR
+          </Link>
+          <Link
+            href={`/cafes/${cafe.id}/ai-waiter`}
+            className={buttonClasses({ variant: 'secondary' })}
+          >
+            AI Waiter
+          </Link>
+          <Link
+            href={`/cafes/${cafe.id}/manager`}
+            className={buttonClasses({ variant: 'secondary' })}
+          >
+            AI Manager
+          </Link>
         </div>
       </FadeIn>
 

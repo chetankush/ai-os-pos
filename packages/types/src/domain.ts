@@ -22,6 +22,8 @@ export interface Cafe {
   isAirConditioned: boolean;
   primaryColor: string | null;
   logoUrl: string | null;
+  onlinePaymentEnabled: boolean;
+  qrPrepaidRequired: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -74,6 +76,8 @@ export type OrderSource = 'counter' | 'qr' | 'phone';
 
 export type PaymentMethod = 'cash' | 'upi' | 'card' | 'online';
 
+export type PaymentStatus = 'unpaid' | 'pending' | 'paid' | 'failed' | 'refunded';
+
 export interface OrderItem {
   id: OrderItemId;
   orderId: OrderId;
@@ -100,6 +104,9 @@ export interface Order {
   totalPaise: number;
   gstRateBp: number;
   paymentMethod: PaymentMethod | null;
+  paymentStatus: PaymentStatus;
+  providerOrderId: string | null;
+  providerPaymentId: string | null;
   createdAt: string;
   updatedAt: string;
   paidAt: string | null;

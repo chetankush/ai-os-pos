@@ -12,6 +12,7 @@ import { FadeIn } from '@/components/ui/motion';
 import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/api-server';
 import { cn } from '@/lib/cn';
+import { PaymentBadge } from '../_components/payment-badge';
 import { OrderActions } from './order-actions';
 import { PrintViews } from './print-views';
 
@@ -80,7 +81,13 @@ export default async function OrderDetailPage({ params }: PageProps) {
             </p>
           </div>
           <div className="flex flex-col items-end gap-3">
-            <StatusPill status={order.status} />
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <StatusPill status={order.status} />
+              <PaymentBadge
+                status={order.paymentStatus}
+                method={order.paymentMethod}
+              />
+            </div>
             <PrintViews order={order} cafe={cafe} />
           </div>
         </div>
@@ -178,6 +185,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
                 cafeId={id}
                 orderId={orderId}
                 initialStatus={order.status}
+                alreadyPaid={order.paymentStatus === 'paid'}
               />
             </Card>
           </div>

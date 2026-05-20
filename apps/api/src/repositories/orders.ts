@@ -6,8 +6,9 @@ import type {
   OrderStatsResponse,
   OrderWithItems,
   PaymentMethod,
+  PaymentStatus,
 } from '@sangam/types';
-import { and, count, desc, eq, gte, sql, sum } from 'drizzle-orm';
+import { and, count, desc, eq, gte, ilike, sql, sum } from 'drizzle-orm';
 
 export interface NewOrderItem {
   menuItemId: string | null;
@@ -43,6 +44,28 @@ export interface OrdersRepository {
     paymentMethod?: PaymentMethod,
   ): Promise<Order | null>;
   todayStats(cafeId: string): Promise<OrderStatsResponse>;
+  /** Best-selling items today (by quantity), scoped to this cafe's orders. */
+  topItemsToday(
+    cafeId: string,
+    limit: number,
+  ): Promise<{ name: string; qty: number; revenuePaise: number }[]>;
+  /** Quantity + revenue sold today for items whose snapshot name matches `name`. */
+  itemSalesToday(
+    cafeId: string,
+    name: string,
+  ): Promise<{ name: string; qty: number; revenuePaise: number }>;
+  /** Look up an order (with items) by its human-facing order number. */
+  findByOrderNumber(orderNumber: string, cafeId: string): Promise<OrderWithItems | null>;
+  /** Diner started online payment: store the provider order id, mark pending. */
+  setPaymentPending(
+    id: string,
+    cafeId: string,
+    providerOrderId: string,
+  ): Promise<Order | null>;
+  /** Signature verified: mark paid, record the provider payment id + paidAt. */
+  markPaid(id: string, cafeId: string, providerPaymentId: string): Promise<Order | null>;
+  /** Signature verification failed: mark the payment failed (retry allowed). */
+  markPaymentFailed(id: string, cafeId: string): Promise<Order | null>;
 }
 
 export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
@@ -124,15 +147,53 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
         status: OrderStatus;
         paidAt?: string;
         paymentMethod?: PaymentMethod;
+        paymentStatus?: PaymentStatus;
       } = { status };
       if (status === 'completed') {
         patch.paidAt = new Date().toISOString();
-        if (paymentMethod) patch.paymentMethod = paymentMethod;
+        if (paymentMethod) {
+          patch.paymentMethod = paymentMethod;
+          // Completing a counter order with a method also settles its payment —
+          // keeps paymentStatus coherent with the recorded method.
+          patch.paymentStatus = 'paid';
+        }
       }
 
       const [row] = await db
         .update(schema.orders)
         .set(patch)
+        .where(and(eq(schema.orders.id, id), eq(schema.orders.cafeId, cafeId)))
+        .returning();
+      return row ?? null;
+    },
+
+    async setPaymentPending(id, cafeId, providerOrderId) {
+      const [row] = await db
+        .update(schema.orders)
+        .set({ providerOrderId, paymentStatus: 'pending' })
+        .where(and(eq(schema.orders.id, id), eq(schema.orders.cafeId, cafeId)))
+        .returning();
+      return row ?? null;
+    },
+
+    async markPaid(id, cafeId, providerPaymentId) {
+      const [row] = await db
+        .update(schema.orders)
+        .set({
+          paymentStatus: 'paid',
+          paymentMethod: 'online',
+          providerPaymentId,
+          paidAt: new Date().toISOString(),
+        })
+        .where(and(eq(schema.orders.id, id), eq(schema.orders.cafeId, cafeId)))
+        .returning();
+      return row ?? null;
+    },
+
+    async markPaymentFailed(id, cafeId) {
+      const [row] = await db
+        .update(schema.orders)
+        .set({ paymentStatus: 'failed' })
         .where(and(eq(schema.orders.id, id), eq(schema.orders.cafeId, cafeId)))
         .returning();
       return row ?? null;
@@ -208,6 +269,87 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
         byStatus,
         paymentBreakdownPaise,
       };
+    },
+
+    async topItemsToday(cafeId, limit) {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayIso = todayStart.toISOString();
+
+      // order_items has no cafeId — scope through the parent order (this cafe,
+      // created today), then group by the snapshot name.
+      const rows = await db
+        .select({
+          name: schema.orderItems.itemNameSnapshot,
+          qty: sum(schema.orderItems.quantity),
+          revenuePaise: sum(schema.orderItems.lineTotalPaise),
+        })
+        .from(schema.orderItems)
+        .innerJoin(schema.orders, eq(schema.orderItems.orderId, schema.orders.id))
+        .where(
+          and(
+            eq(schema.orders.cafeId, cafeId),
+            gte(schema.orders.createdAt, todayIso),
+          ),
+        )
+        .groupBy(schema.orderItems.itemNameSnapshot)
+        .orderBy(desc(sum(schema.orderItems.quantity)))
+        .limit(limit);
+
+      return rows.map((r) => ({
+        name: r.name,
+        qty: Number(r.qty ?? 0),
+        revenuePaise: Number(r.revenuePaise ?? 0),
+      }));
+    },
+
+    async itemSalesToday(cafeId, name) {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayIso = todayStart.toISOString();
+
+      const [row] = await db
+        .select({
+          qty: sum(schema.orderItems.quantity),
+          revenuePaise: sum(schema.orderItems.lineTotalPaise),
+        })
+        .from(schema.orderItems)
+        .innerJoin(schema.orders, eq(schema.orderItems.orderId, schema.orders.id))
+        .where(
+          and(
+            eq(schema.orders.cafeId, cafeId),
+            gte(schema.orders.createdAt, todayIso),
+            ilike(schema.orderItems.itemNameSnapshot, `%${name}%`),
+          ),
+        );
+
+      return {
+        name,
+        qty: Number(row?.qty ?? 0),
+        revenuePaise: Number(row?.revenuePaise ?? 0),
+      };
+    },
+
+    async findByOrderNumber(orderNumber, cafeId) {
+      const [orderRow] = await db
+        .select()
+        .from(schema.orders)
+        .where(
+          and(
+            eq(schema.orders.orderNumber, orderNumber),
+            eq(schema.orders.cafeId, cafeId),
+          ),
+        )
+        .limit(1);
+
+      if (!orderRow) return null;
+
+      const items = await db
+        .select()
+        .from(schema.orderItems)
+        .where(eq(schema.orderItems.orderId, orderRow.id));
+
+      return { ...orderRow, items };
     },
   };
 }

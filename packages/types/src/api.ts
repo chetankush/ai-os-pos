@@ -11,6 +11,7 @@ import type {
   OrderStatus,
   OrderWithItems,
   PaymentMethod,
+  PaymentStatus,
   SettleConfig,
   SettleReport,
   SettleStatement,
@@ -62,6 +63,8 @@ export interface UpdateCafeRequest {
   isAirConditioned?: boolean;
   primaryColor?: string | null;
   logoUrl?: string | null;
+  onlinePaymentEnabled?: boolean;
+  qrPrepaidRequired?: boolean;
 }
 
 export interface CafesListResponse {
@@ -152,6 +155,78 @@ export interface OrderStatsResponse {
 export interface UpdateOrderStatusRequest {
   status: OrderStatus;
   paymentMethod?: PaymentMethod;
+}
+
+// ─── Public QR ordering + payments (unauthenticated diner flow) ────────────────
+
+/** Public, diner-safe cafe fields returned with the QR menu. */
+export interface PublicCafe {
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  primaryColor: string | null;
+  city: string;
+  /** Effective: cafe opted in AND the server has Razorpay keys configured. */
+  onlinePaymentEnabled: boolean;
+  /** If true, QR orders must be paid online before they're accepted. */
+  prepaidRequired: boolean;
+}
+
+export interface PublicMenuResponse {
+  cafe: PublicCafe;
+  categories: MenuCategoryWithItems[];
+}
+
+/** Diner-safe confirmation returned after placing a QR order. */
+export interface PublicOrder {
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  totalPaise: number;
+  tableLabel: string | null;
+}
+
+export interface PublicOrderResponse {
+  order: PublicOrder;
+}
+
+/** A single line on a diner's order (name + quantity, no internal ids). */
+export interface PublicOrderLine {
+  name: string;
+  quantity: number;
+}
+
+/** Full diner-safe order, used to refresh live status for "Your orders". */
+export interface PublicOrderDetail extends PublicOrder {
+  items: PublicOrderLine[];
+  createdAt: string;
+}
+
+export interface PublicOrderDetailResponse {
+  order: PublicOrderDetail;
+}
+
+/** Response from starting payment on a QR order — drives Razorpay Checkout. */
+export interface CreatePaymentResponse {
+  /** Razorpay public key id — the client opens Checkout with this. */
+  keyId: string;
+  /** Razorpay order id. */
+  providerOrderId: string;
+  amountPaise: number;
+  currency: string;
+  orderId: string;
+}
+
+/** Razorpay Checkout success payload, posted back for server verification. */
+export interface VerifyPaymentRequest {
+  razorpayPaymentId: string;
+  razorpayOrderId: string;
+  razorpaySignature: string;
+}
+
+export interface VerifyPaymentResponse {
+  order: PublicOrder;
 }
 
 // ─── Settle ─────────────────────────────────────────────────────────────────

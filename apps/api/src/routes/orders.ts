@@ -6,9 +6,9 @@ import { createDrizzleMenuRepo, type MenuRepository } from '../repositories/menu
 import {
   createDrizzleOrdersRepo,
   type NewOrder,
-  type NewOrderItem,
   type OrdersRepository,
 } from '../repositories/orders.js';
+import { OrderBuildError, buildOrder, generateOrderNumber } from '../orders/build.js';
 
 export interface OrdersRoutesOptions {
   repository?: OrdersRepository;
@@ -47,12 +47,6 @@ const updateStatusBodySchema = z.object({
   status: z.enum(['pending', 'preparing', 'ready', 'completed', 'cancelled']),
   paymentMethod: z.enum(['cash', 'upi', 'card', 'online']).optional(),
 });
-
-function generateOrderNumber(): string {
-  // Short, terse, unique-per-cafe (enforced by unique index): "M-A3B7F1"
-  const r = Math.random().toString(36).slice(2, 8).toUpperCase().padEnd(6, 'X');
-  return `S-${r}`;
-}
 
 // Forward-only state machine; cancel allowed from any non-terminal state.
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
@@ -95,57 +89,19 @@ export async function ordersRoutes(
       }
 
       const body = createOrderBodySchema.parse(request.body);
-
-      // Look up each menu item to snapshot price + name. Bulk-fetch via the
-      // existing getFullMenu (single round-trip).
       const menu = await menuRepo.getFullMenu(cafeId);
-      const allItems = new Map<string, { name: string; price: number; available: boolean }>();
-      for (const cat of menu) {
-        for (const item of cat.items) {
-          allItems.set(item.id, {
-            name: item.name,
-            price: item.basePricePaise,
-            available: item.isAvailable,
-          });
-        }
-      }
 
-      const newItems: NewOrderItem[] = [];
-      for (const line of body.items) {
-        const snapshot = allItems.get(line.menuItemId);
-        if (!snapshot) {
+      let built: ReturnType<typeof buildOrder>;
+      try {
+        built = buildOrder(cafe, menu, body.items);
+      } catch (err) {
+        if (err instanceof OrderBuildError) {
           return reply.status(400).send({
-            error: {
-              code: 'INVALID_ITEM',
-              message: `Menu item ${line.menuItemId} not found in this cafe`,
-            },
+            error: { code: err.code, message: err.message },
           });
         }
-        if (!snapshot.available) {
-          return reply.status(400).send({
-            error: {
-              code: 'ITEM_UNAVAILABLE',
-              message: `Item "${snapshot.name}" is currently unavailable`,
-            },
-          });
-        }
-        newItems.push({
-          menuItemId: line.menuItemId,
-          itemNameSnapshot: snapshot.name,
-          unitPricePaise: snapshot.price,
-          quantity: line.quantity,
-          notes: line.notes ?? null,
-        });
+        throw err;
       }
-
-      // GST: 18% for AC cafe, 5% otherwise. Stored in basis points.
-      const gstRateBp = cafe.isAirConditioned ? 1800 : 500;
-      const subtotal = newItems.reduce(
-        (sum, it) => sum + it.unitPricePaise * it.quantity,
-        0,
-      );
-      const tax = Math.round((subtotal * gstRateBp) / 10000);
-      const total = subtotal + tax;
 
       const newOrder: NewOrder = {
         cafeId,
@@ -155,11 +111,11 @@ export async function ordersRoutes(
         customerName: body.customerName ?? null,
         customerPhone: body.customerPhone ?? null,
         notes: body.notes ?? null,
-        subtotalPaise: subtotal,
-        taxPaise: tax,
-        totalPaise: total,
-        gstRateBp,
-        items: newItems,
+        subtotalPaise: built.subtotalPaise,
+        taxPaise: built.taxPaise,
+        totalPaise: built.totalPaise,
+        gstRateBp: built.gstRateBp,
+        items: built.items,
       };
 
       try {

@@ -30,12 +30,16 @@ export interface UpdateCafe {
   isAirConditioned?: boolean;
   primaryColor?: string | null;
   logoUrl?: string | null;
+  onlinePaymentEnabled?: boolean;
+  qrPrepaidRequired?: boolean;
 }
 
 export interface CafesRepository {
   create(data: NewCafe): Promise<Cafe>;
   listByOwner(ownerId: string): Promise<Cafe[]>;
   findByIdAndOwner(id: string, ownerId: string): Promise<Cafe | null>;
+  /** Public lookup by slug (for QR menu pages — not owner-scoped). */
+  findBySlug(slug: string): Promise<Cafe | null>;
   update(id: string, ownerId: string, patch: UpdateCafe): Promise<Cafe | null>;
 }
 
@@ -60,6 +64,15 @@ export function createDrizzleCafesRepo(db: Database): CafesRepository {
         .select()
         .from(schema.cafes)
         .where(and(eq(schema.cafes.id, id), eq(schema.cafes.ownerId, ownerId)))
+        .limit(1);
+      return row ?? null;
+    },
+
+    async findBySlug(slug) {
+      const [row] = await db
+        .select()
+        .from(schema.cafes)
+        .where(eq(schema.cafes.slug, slug))
         .limit(1);
       return row ?? null;
     },

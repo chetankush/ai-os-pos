@@ -25,6 +25,8 @@ function makeCafe(overrides: Partial<Cafe> = {}): Cafe {
     isAirConditioned: false,
     primaryColor: null,
     logoUrl: null,
+    onlinePaymentEnabled: false,
+    qrPrepaidRequired: false,
     createdAt: '2026-05-17T00:00:00.000Z',
     updatedAt: '2026-05-17T00:00:00.000Z',
     ...overrides,
@@ -36,6 +38,7 @@ function createMockRepo() {
     create: vi.fn<(data: NewCafe) => Promise<Cafe>>(),
     listByOwner: vi.fn<(ownerId: string) => Promise<Cafe[]>>(),
     findByIdAndOwner: vi.fn<(id: string, ownerId: string) => Promise<Cafe | null>>(),
+    findBySlug: vi.fn<(slug: string) => Promise<Cafe | null>>(),
     update: vi.fn<(id: string, ownerId: string, patch: object) => Promise<Cafe | null>>(),
   } satisfies CafesRepository;
 }

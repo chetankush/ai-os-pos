@@ -57,6 +57,8 @@ const updateCafeBodySchema = z
       .regex(/^#[0-9a-fA-F]{6}$/, 'primaryColor must be a hex color like #ff8800')
       .nullable(),
     logoUrl: z.string().trim().url().nullable(),
+    onlinePaymentEnabled: z.boolean(),
+    qrPrepaidRequired: z.boolean(),
   })
   .partial();
 

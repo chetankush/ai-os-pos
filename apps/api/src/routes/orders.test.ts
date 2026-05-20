@@ -39,6 +39,8 @@ function makeCafe(overrides: Partial<Cafe> = {}): Cafe {
     isAirConditioned: false,
     primaryColor: null,
     logoUrl: null,
+    onlinePaymentEnabled: false,
+    qrPrepaidRequired: false,
     createdAt: '2026-05-20T00:00:00.000Z',
     updatedAt: '2026-05-20T00:00:00.000Z',
     ...overrides,
@@ -82,6 +84,9 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
     totalPaise: 31500,
     gstRateBp: 500,
     paymentMethod: null,
+    paymentStatus: 'unpaid',
+    providerOrderId: null,
+    providerPaymentId: null,
     createdAt: '2026-05-20T00:00:00.000Z',
     updatedAt: '2026-05-20T00:00:00.000Z',
     paidAt: null,
@@ -114,6 +119,27 @@ function createMockOrdersRepo() {
     findByIdAndCafe: vi.fn<(id: string, cafeId: string) => Promise<OrderWithItems | null>>(),
     updateStatus: vi.fn<(id: string, cafeId: string, status: OrderStatus) => Promise<Order | null>>(),
     todayStats: vi.fn<(cafeId: string) => Promise<OrderStatsResponse>>(),
+    setPaymentPending:
+      vi.fn<(id: string, cafeId: string, providerOrderId: string) => Promise<Order | null>>(),
+    markPaid:
+      vi.fn<(id: string, cafeId: string, providerPaymentId: string) => Promise<Order | null>>(),
+    markPaymentFailed: vi.fn<(id: string, cafeId: string) => Promise<Order | null>>(),
+    topItemsToday:
+      vi.fn<
+        (
+          cafeId: string,
+          limit: number,
+        ) => Promise<{ name: string; qty: number; revenuePaise: number }[]>
+      >(),
+    itemSalesToday:
+      vi.fn<
+        (
+          cafeId: string,
+          name: string,
+        ) => Promise<{ name: string; qty: number; revenuePaise: number }>
+      >(),
+    findByOrderNumber:
+      vi.fn<(orderNumber: string, cafeId: string) => Promise<OrderWithItems | null>>(),
   } satisfies OrdersRepository;
 }
 

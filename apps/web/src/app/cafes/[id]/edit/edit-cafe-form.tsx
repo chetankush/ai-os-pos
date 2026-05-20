@@ -11,6 +11,7 @@ import { ImageUpload } from '@/components/ui/image-upload';
 import { Field } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { ApiError } from '@/lib/api';
+import { cn } from '@/lib/cn';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -26,6 +27,8 @@ interface FormState {
   gstin: string;
   fssai: string;
   isAirConditioned: boolean;
+  onlinePaymentEnabled: boolean;
+  qrPrepaidRequired: boolean;
   primaryColor: string;
 }
 
@@ -89,6 +92,8 @@ export function EditCafeForm({ cafe }: { cafe: Cafe }) {
     gstin: cafe.gstin ?? '',
     fssai: cafe.fssai ?? '',
     isAirConditioned: cafe.isAirConditioned,
+    onlinePaymentEnabled: cafe.onlinePaymentEnabled,
+    qrPrepaidRequired: cafe.qrPrepaidRequired,
     primaryColor: cafe.primaryColor ?? '',
   });
   // Logo lives outside FormState since ImageUpload owns its value/onChange.
@@ -154,6 +159,10 @@ export function EditCafeForm({ cafe }: { cafe: Cafe }) {
       gstin: form.gstin.trim() || null,
       fssai: form.fssai.trim() || null,
       isAirConditioned: form.isAirConditioned,
+      onlinePaymentEnabled: form.onlinePaymentEnabled,
+      // Prepayment is meaningless without online payments — never persist a
+      // stale "on" value while the dependent toggle is disabled.
+      qrPrepaidRequired: form.onlinePaymentEnabled && form.qrPrepaidRequired,
       primaryColor: form.primaryColor.trim() || null,
       logoUrl,
     };
@@ -368,6 +377,65 @@ export function EditCafeForm({ cafe }: { cafe: Cafe }) {
               </p>
             </div>
           </label>
+
+          <div className="space-y-3 pt-2">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+              Payments
+            </h3>
+
+            <label className="flex items-start gap-3 p-3 rounded-md border border-border bg-subtle/40 cursor-pointer hover:border-border-strong transition-colors">
+              <input
+                type="checkbox"
+                checked={form.onlinePaymentEnabled}
+                onChange={(e) =>
+                  update('onlinePaymentEnabled', e.target.checked)
+                }
+                className="mt-0.5 size-4 accent-fg"
+              />
+              <div className="space-y-0.5">
+                <span className="text-sm font-medium">
+                  Accept online payments (Razorpay)
+                </span>
+                <p className="text-xs text-muted">
+                  Let diners pay from their phone when they scan the table QR.
+                </p>
+              </div>
+            </label>
+
+            {/*
+              Prepayment depends on online payments. When disabled we drop the
+              opacity, swap the cursor, and set the input's `disabled` attribute
+              so it's semantically (not just visually) inert.
+            */}
+            <label
+              className={cn(
+                'flex items-start gap-3 p-3 rounded-md border border-border bg-subtle/40 transition-colors',
+                form.onlinePaymentEnabled
+                  ? 'cursor-pointer hover:border-border-strong'
+                  : 'opacity-50 cursor-not-allowed',
+              )}
+            >
+              <input
+                type="checkbox"
+                disabled={!form.onlinePaymentEnabled}
+                checked={form.onlinePaymentEnabled && form.qrPrepaidRequired}
+                onChange={(e) => update('qrPrepaidRequired', e.target.checked)}
+                className={cn(
+                  'mt-0.5 size-4 accent-fg',
+                  !form.onlinePaymentEnabled && 'cursor-not-allowed',
+                )}
+              />
+              <div className="space-y-0.5">
+                <span className="text-sm font-medium">
+                  Require prepayment for QR orders
+                </span>
+                <p className="text-xs text-muted">
+                  Diners must pay online before the order reaches the kitchen.
+                  Off = pay-later tab or pay at counter.
+                </p>
+              </div>
+            </label>
+          </div>
 
           {formError && (
             <p
