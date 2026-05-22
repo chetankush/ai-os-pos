@@ -8,12 +8,17 @@ import {
   type NewOrder,
   type OrdersRepository,
 } from '../repositories/orders.js';
+import {
+  type AuditLogsRepository,
+  createDrizzleAuditLogsRepo,
+} from '../repositories/audit-logs.js';
 import { OrderBuildError, buildOrder } from '../orders/build.js';
 
 export interface OrdersRoutesOptions {
   repository?: OrdersRepository;
   cafesRepository?: CafesRepository;
   menuRepository?: MenuRepository;
+  auditRepository?: AuditLogsRepository;
 }
 
 const cafeParamsSchema = z.object({ cafeId: z.string().uuid() });
@@ -60,6 +65,24 @@ const updateStatusBodySchema = z.object({
   paymentMethod: z.enum(['cash', 'upi', 'card', 'online']).optional(),
 });
 
+const settleBodySchema = z.object({
+  payments: z
+    .array(
+      z.object({
+        method: z.enum(['cash', 'upi', 'card', 'online']),
+        amountPaise: z.number().int().min(1),
+      }),
+    )
+    .min(1, 'at least one payment is required')
+    .max(4),
+});
+
+const refundBodySchema = z.object({
+  method: z.enum(['cash', 'upi', 'card', 'online']),
+  amountPaise: z.number().int().min(1),
+  reason: z.string().trim().max(200).optional(),
+});
+
 // Forward-only state machine; cancel allowed from any non-terminal state.
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   pending: ['preparing', 'cancelled'],
@@ -76,6 +99,7 @@ export async function ordersRoutes(
   const ordersRepo = opts.repository ?? createDrizzleOrdersRepo(app.db);
   const cafesRepo = opts.cafesRepository ?? createDrizzleCafesRepo(app.db);
   const menuRepo = opts.menuRepository ?? createDrizzleMenuRepo(app.db);
+  const auditRepo = opts.auditRepository ?? createDrizzleAuditLogsRepo(app.db);
   const cache = getCache();
 
   function statsKey(cafeId: string): string {
@@ -258,6 +282,111 @@ export async function ordersRoutes(
 
       await cache.del(statsKey(cafeId));
       return { order: { ...updated, items: current.items } };
+    },
+  );
+
+  // ─── POST /cafes/:cafeId/orders/:orderId/settle — split tender ───────────────
+  app.post(
+    '/cafes/:cafeId/orders/:orderId/settle',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { cafeId, orderId } = orderParamsSchema.parse(request.params);
+      if (!(await getOwnedCafe(cafeId, request.user.id))) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Cafe not found' } });
+      }
+      const body = settleBodySchema.parse(request.body);
+
+      const current = await ordersRepo.findByIdAndCafe(orderId, cafeId);
+      if (!current) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Order not found' } });
+      }
+      if (current.paymentStatus === 'paid') {
+        return reply
+          .status(409)
+          .send({ error: { code: 'ALREADY_PAID', message: 'Order is already paid' } });
+      }
+      const tendered = body.payments.reduce((s, p) => s + p.amountPaise, 0);
+      if (tendered !== current.totalPaise) {
+        return reply.status(400).send({
+          error: {
+            code: 'AMOUNT_MISMATCH',
+            message: `Tendered ₹${tendered / 100} must equal the bill total ₹${current.totalPaise / 100}`,
+          },
+        });
+      }
+
+      const updated = await ordersRepo.settleWithPayments(orderId, cafeId, body.payments);
+      if (!updated) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Order not found' } });
+      }
+      await cache.del(statsKey(cafeId));
+      return { order: { ...updated, items: current.items } };
+    },
+  );
+
+  // ─── POST /cafes/:cafeId/orders/:orderId/refund ─────────────────────────────
+  app.post(
+    '/cafes/:cafeId/orders/:orderId/refund',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { cafeId, orderId } = orderParamsSchema.parse(request.params);
+      if (!(await getOwnedCafe(cafeId, request.user.id))) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Cafe not found' } });
+      }
+      const body = refundBodySchema.parse(request.body);
+
+      const current = await ordersRepo.findByIdAndCafe(orderId, cafeId);
+      if (!current) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Order not found' } });
+      }
+      if (current.paymentStatus !== 'paid' && current.paymentStatus !== 'refunded') {
+        return reply.status(400).send({
+          error: { code: 'NOT_REFUNDABLE', message: 'Only a paid order can be refunded' },
+        });
+      }
+      if (body.amountPaise > current.totalPaise) {
+        return reply.status(400).send({
+          error: { code: 'AMOUNT_TOO_HIGH', message: 'Refund cannot exceed the order total' },
+        });
+      }
+
+      const updated = await ordersRepo.refund(orderId, cafeId, {
+        method: body.method,
+        amountPaise: body.amountPaise,
+        reason: body.reason ?? null,
+      });
+      if (!updated) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Order not found' } });
+      }
+
+      // Refunds are sensitive — record who did it for the audit trail.
+      await auditRepo.record({
+        cafeId,
+        actorType: 'owner',
+        actorId: request.user.id,
+        action: 'order.refund',
+        entityType: 'order',
+        entityId: orderId,
+        summary: `Refunded ₹${body.amountPaise / 100} (${body.method}) on ${current.orderNumber}`,
+        metadata: { amountPaise: body.amountPaise, method: body.method, reason: body.reason ?? null },
+      });
+
+      await cache.del(statsKey(cafeId));
+      return { order: { ...updated, items: current.items } };
+    },
+  );
+
+  // ─── GET /cafes/:cafeId/orders/:orderId/payments — tender ledger ─────────────
+  app.get(
+    '/cafes/:cafeId/orders/:orderId/payments',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { cafeId, orderId } = orderParamsSchema.parse(request.params);
+      if (!(await getOwnedCafe(cafeId, request.user.id))) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Cafe not found' } });
+      }
+      const payments = await ordersRepo.listPayments(orderId, cafeId);
+      return { payments };
     },
   );
 }

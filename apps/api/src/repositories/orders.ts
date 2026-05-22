@@ -2,13 +2,14 @@ import { schema, type Database } from '@sangam/db';
 import type {
   Order,
   OrderItem,
+  OrderPayment,
   OrderStatus,
   OrderStatsResponse,
   OrderWithItems,
   PaymentMethod,
   PaymentStatus,
 } from '@sangam/types';
-import { and, count, desc, eq, gte, ilike, inArray, sql, sum } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, ilike, inArray, sql, sum } from 'drizzle-orm';
 import { buildBillNumber, financialYear } from '../orders/build.js';
 
 export interface NewOrderItem {
@@ -74,6 +75,24 @@ export interface OrdersRepository {
   markPaid(id: string, cafeId: string, providerPaymentId: string): Promise<Order | null>;
   /** Signature verification failed: mark the payment failed (retry allowed). */
   markPaymentFailed(id: string, cafeId: string): Promise<Order | null>;
+  /**
+   * Settle an order with one or more tenders (split payment). Records each
+   * tender in order_payments and completes the order (paid). paymentMethod is
+   * set for a single tender, left null for a true split.
+   */
+  settleWithPayments(
+    id: string,
+    cafeId: string,
+    payments: { method: PaymentMethod; amountPaise: number }[],
+  ): Promise<Order | null>;
+  /** Refund all or part of an order — records a refund tender, marks refunded. */
+  refund(
+    id: string,
+    cafeId: string,
+    refund: { method: PaymentMethod; amountPaise: number; reason: string | null },
+  ): Promise<Order | null>;
+  /** The tender ledger (payments + refunds) for an order, oldest-first. */
+  listPayments(id: string, cafeId: string): Promise<OrderPayment[]>;
 }
 
 export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
@@ -255,6 +274,75 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
         .where(and(eq(schema.orders.id, id), eq(schema.orders.cafeId, cafeId)))
         .returning();
       return row ?? null;
+    },
+
+    async settleWithPayments(id, cafeId, payments) {
+      return db.transaction(async (tx) => {
+        const [order] = await tx
+          .select()
+          .from(schema.orders)
+          .where(and(eq(schema.orders.id, id), eq(schema.orders.cafeId, cafeId)))
+          .limit(1);
+        if (!order) return null;
+
+        await tx.insert(schema.orderPayments).values(
+          payments.map((p) => ({
+            cafeId,
+            orderId: id,
+            kind: 'payment' as const,
+            method: p.method,
+            amountPaise: p.amountPaise,
+          })),
+        );
+
+        const [row] = await tx
+          .update(schema.orders)
+          .set({
+            status: 'completed',
+            paymentStatus: 'paid',
+            // Single tender keeps a concrete method; a true split leaves it null.
+            paymentMethod: payments.length === 1 ? (payments[0]?.method ?? null) : null,
+            paidAt: new Date().toISOString(),
+          })
+          .where(and(eq(schema.orders.id, id), eq(schema.orders.cafeId, cafeId)))
+          .returning();
+        return row ?? null;
+      });
+    },
+
+    async refund(id, cafeId, refundData) {
+      return db.transaction(async (tx) => {
+        const [order] = await tx
+          .select()
+          .from(schema.orders)
+          .where(and(eq(schema.orders.id, id), eq(schema.orders.cafeId, cafeId)))
+          .limit(1);
+        if (!order) return null;
+
+        await tx.insert(schema.orderPayments).values({
+          cafeId,
+          orderId: id,
+          kind: 'refund',
+          method: refundData.method,
+          amountPaise: refundData.amountPaise,
+          reason: refundData.reason,
+        });
+
+        const [row] = await tx
+          .update(schema.orders)
+          .set({ paymentStatus: 'refunded' })
+          .where(and(eq(schema.orders.id, id), eq(schema.orders.cafeId, cafeId)))
+          .returning();
+        return row ?? null;
+      });
+    },
+
+    async listPayments(id, cafeId) {
+      return db
+        .select()
+        .from(schema.orderPayments)
+        .where(and(eq(schema.orderPayments.orderId, id), eq(schema.orderPayments.cafeId, cafeId)))
+        .orderBy(asc(schema.orderPayments.createdAt)) as Promise<OrderPayment[]>;
     },
 
     async todayStats(cafeId) {

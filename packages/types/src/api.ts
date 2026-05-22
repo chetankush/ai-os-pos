@@ -10,6 +10,7 @@ import type {
   MenuCategoryWithItems,
   MenuItem,
   Order,
+  OrderPayment,
   OrderStatus,
   OrderWithItems,
   PaymentMethod,
@@ -173,6 +174,22 @@ export interface UpdateOrderStatusRequest {
   paymentMethod?: PaymentMethod;
 }
 
+/** Settle an order with one or more tenders (split payment) and complete it. */
+export interface SettleOrderRequest {
+  payments: Array<{ method: PaymentMethod; amountPaise: number }>;
+}
+
+/** Refund all or part of a paid order. */
+export interface RefundOrderRequest {
+  method: PaymentMethod;
+  amountPaise: number;
+  reason?: string;
+}
+
+export interface OrderPaymentsResponse {
+  payments: OrderPayment[];
+}
+
 // ─── Public QR ordering + payments (unauthenticated diner flow) ────────────────
 
 /** Public, diner-safe cafe fields returned with the QR menu. */
@@ -186,6 +203,9 @@ export interface PublicCafe {
   onlinePaymentEnabled: boolean;
   /** If true, QR orders must be paid online before they're accepted. */
   prepaidRequired: boolean;
+  /** GST rate in basis points (500 = 5%, 1800 = 18%, 0 = composition/exempt).
+   *  Lets the diner show a GST line + the true payable total before checkout. */
+  gstRateBp: number;
 }
 
 export interface PublicMenuResponse {

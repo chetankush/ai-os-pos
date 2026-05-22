@@ -27,7 +27,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <aside className="hidden lg:flex flex-col justify-between border-l border-border bg-subtle/40 p-12">
         <FadeIn delay={0.1}>
           <p className="text-sm uppercase tracking-[0.18em] text-muted">
-            RestaurantOS
+            Sangam
           </p>
         </FadeIn>
         <FadeIn delay={0.15}>

@@ -146,6 +146,22 @@ export function analyzeStatement(
     });
   }
 
+  // 4b. Penalties / fines — verify each was genuinely the restaurant's fault.
+  const penalty = sumCategories(stmt, 'penalty');
+  if (penalty > 0) {
+    findings.push({
+      code: 'PENALTY_DEDUCTION',
+      title: 'Penalties / fines charged to you',
+      detail:
+        `${rupees(penalty)} was charged as penalties/fines (order rejections, SLA ` +
+        `breaches, etc.). Verify each — penalties for platform- or delivery-fault ` +
+        `issues, or applied without notice, are disputable.`,
+      amountPaise: penalty,
+      severity: 'medium',
+      disputable: true,
+    });
+  }
+
   // 5. Informational: take rate above the typical 25-35% band.
   if (effectiveTakeRatePct > HIGH_TAKE_RATE_PCT) {
     findings.push({

@@ -134,6 +134,21 @@ export interface OrderWithItems extends Order {
   items: OrderItem[];
 }
 
+export type OrderPaymentKind = 'payment' | 'refund';
+
+/** One tender or refund against an order — powers split tender + refunds. */
+export interface OrderPayment {
+  id: string;
+  cafeId: CafeId;
+  orderId: OrderId;
+  kind: OrderPaymentKind;
+  method: PaymentMethod;
+  /** Positive magnitude in paise (kind distinguishes payment vs refund). */
+  amountPaise: number;
+  reason: string | null;
+  createdAt: string;
+}
+
 // ─── Tables & floor plan ────────────────────────────────────────────────────────
 
 export type TableId = string;

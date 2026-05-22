@@ -97,6 +97,9 @@ function createMockOrdersRepo() {
     topItemsToday: vi.fn(),
     itemSalesToday: vi.fn(),
     findByOrderNumber: vi.fn(),
+    settleWithPayments: vi.fn(),
+    refund: vi.fn(),
+    listPayments: vi.fn(),
   } satisfies OrdersRepository;
 }
 

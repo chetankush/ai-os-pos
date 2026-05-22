@@ -4,6 +4,7 @@ export * from './cafes.js';
 export * from './cash-drawer-sessions.js';
 export * from './invoice-sequences.js';
 export * from './menu.js';
+export * from './order-payments.js';
 export * from './orders.js';
 export * from './staff.js';
 export * from './tables.js';

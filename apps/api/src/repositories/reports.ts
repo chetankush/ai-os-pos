@@ -9,7 +9,7 @@ import type {
   SalesRow,
   SourceBreakdown,
 } from '@sangam/types';
-import { and, count, desc, eq, gte, lt, ne, sql, sum } from 'drizzle-orm';
+import { and, count, desc, eq, gte, isNull, lt, ne, sql, sum } from 'drizzle-orm';
 import { istDayRange, istHourOf, istRange } from '../reports/date-range.js';
 
 const PAYMENT_METHODS: PaymentMethod[] = ['cash', 'upi', 'card', 'online'];
@@ -42,7 +42,8 @@ export function createDrizzleReportsRepo(db: Database): ReportsRepository {
       );
       const notCancelled = and(inDay, ne(schema.orders.status, 'cancelled'));
 
-      const [totalsAgg, paymentAgg, sourceAgg, cancelledAgg, completedAgg] = await Promise.all([
+      const [totalsAgg, paymentAgg, sourceAgg, cancelledAgg, completedAgg, splitAgg] =
+        await Promise.all([
         db
           .select({
             gross: sum(schema.orders.totalPaise),
@@ -81,6 +82,27 @@ export function createDrizzleReportsRepo(db: Database): ReportsRepository {
           .select({ orders: count() })
           .from(schema.orders)
           .where(and(inDay, eq(schema.orders.status, 'completed'))),
+        // Split-tender amounts live in order_payments; the parent order has a
+        // null paymentMethod, so add them per method (single-tender is above).
+        db
+          .select({
+            method: schema.orderPayments.method,
+            gross: sum(schema.orderPayments.amountPaise),
+            payments: count(),
+          })
+          .from(schema.orderPayments)
+          .innerJoin(schema.orders, eq(schema.orderPayments.orderId, schema.orders.id))
+          .where(
+            and(
+              eq(schema.orderPayments.cafeId, cafeId),
+              eq(schema.orderPayments.kind, 'payment'),
+              isNull(schema.orders.paymentMethod),
+              gte(schema.orders.createdAt, fromIso),
+              lt(schema.orders.createdAt, toIso),
+              ne(schema.orders.status, 'cancelled'),
+            ),
+          )
+          .groupBy(schema.orderPayments.method),
       ]);
 
       // Payment breakdown — keep a stable order; skip null-method rows (e.g.
@@ -91,6 +113,14 @@ export function createDrizzleReportsRepo(db: Database): ReportsRepository {
         paymentByMethod.set(row.method, {
           gross: Number(row.gross ?? 0),
           count: Number(row.orders),
+        });
+      }
+      // Fold in split-tender amounts (order_payments) on top of single-tender.
+      for (const row of splitAgg) {
+        const cur = paymentByMethod.get(row.method) ?? { gross: 0, count: 0 };
+        paymentByMethod.set(row.method, {
+          gross: cur.gross + Number(row.gross ?? 0),
+          count: cur.count + Number(row.payments),
         });
       }
       const byPaymentMethod: PaymentMethodBreakdown[] = PAYMENT_METHODS.filter((m) =>

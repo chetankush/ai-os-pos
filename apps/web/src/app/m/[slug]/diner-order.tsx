@@ -159,6 +159,14 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
     () => cartLines.reduce((s, l) => s + l.item.basePricePaise * l.quantity, 0),
     [cartLines],
   );
+  // GST mirrors the server calc (gstRateBpFor) so the diner sees the true
+  // payable total — incl. GST — before checkout, not a surprise at Razorpay.
+  const gstRateBp = cafe.gstRateBp ?? 0;
+  const taxPaise = useMemo(
+    () => Math.round((subtotalPaise * gstRateBp) / 10000),
+    [subtotalPaise, gstRateBp],
+  );
+  const totalPaise = subtotalPaise + taxPaise;
 
   const onlinePay = cafe.onlinePaymentEnabled;
   const prepaid = onlinePay && cafe.prepaidRequired;
@@ -614,11 +622,23 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
             </div>
 
             <div className="border-t border-border p-4">
-              <div className="mb-3 flex items-baseline justify-between">
-                <span className="text-sm text-muted">Subtotal</span>
-                <span className="text-lg font-semibold tabular-nums">
-                  {formatRupees(subtotalPaise)}
-                </span>
+              <div className="mb-3 space-y-1">
+                <div className="flex items-baseline justify-between text-sm text-muted">
+                  <span>Subtotal</span>
+                  <span className="tabular-nums">{formatRupees(subtotalPaise)}</span>
+                </div>
+                {taxPaise > 0 && (
+                  <div className="flex items-baseline justify-between text-sm text-muted">
+                    <span>GST ({(gstRateBp / 100).toFixed(gstRateBp % 100 ? 1 : 0)}%)</span>
+                    <span className="tabular-nums">{formatRupees(taxPaise)}</span>
+                  </div>
+                )}
+                <div className="flex items-baseline justify-between border-t border-border pt-1">
+                  <span className="text-sm font-medium">Total</span>
+                  <span className="text-lg font-semibold tabular-nums">
+                    {formatRupees(totalPaise)}
+                  </span>
+                </div>
               </div>
               <Button
                 type="button"
@@ -631,13 +651,13 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
                 {submitting
                   ? 'Placing order'
                   : prepaid
-                    ? `Place order · pay ${formatRupees(subtotalPaise)}`
+                    ? `Place order · pay ${formatRupees(totalPaise)}`
                     : 'Place order'}
               </Button>
               <p className="mt-2 text-center text-[11px] text-muted">
                 {prepaid
                   ? 'Pay securely on your phone to confirm.'
-                  : 'Taxes are calculated at checkout.'}
+                  : 'Pay at the counter after your meal.'}
               </p>
             </div>
           </div>

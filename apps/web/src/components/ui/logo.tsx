@@ -5,14 +5,23 @@ import { cn } from '@/lib/cn';
  * "Sangam" (संगम, confluence): three things meeting as one. Drawn with
  * `currentColor` so it inherits text color (use `text-accent` for the brand coral).
  */
-export function TriquetraMark({ className }: { className?: string }) {
+export function TriquetraMark({
+  className,
+  decorative = false,
+}: {
+  className?: string;
+  /** When the mark sits next to the visible "Sangam" wordmark, mark it
+   *  decorative so screen readers / the a11y tree don't read "Sangam" twice. */
+  decorative?: boolean;
+}) {
   return (
     <svg
       viewBox="0 0 48 48"
       fill="none"
       className={className}
-      role="img"
-      aria-label="Sangam"
+      {...(decorative
+        ? { 'aria-hidden': true }
+        : { role: 'img', 'aria-label': 'Sangam' })}
     >
       <g
         stroke="currentColor"
@@ -46,7 +55,10 @@ export function Logo({
 }) {
   return (
     <span className={cn('inline-flex items-center gap-2', className)}>
-      <TriquetraMark className={cn('size-7 text-accent', markClassName)} />
+      <TriquetraMark
+        className={cn('size-7 text-accent', markClassName)}
+        decorative={showWord}
+      />
       {showWord && (
         <span className="text-base font-semibold tracking-tight">Sangam</span>
       )}

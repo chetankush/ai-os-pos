@@ -21,9 +21,15 @@ const envSchema = z.object({
         .map((origin) => origin.trim())
         .filter(Boolean),
     ),
+  // AI provider — any OpenAI-compatible chat-completions endpoint.
+  // Default is OpenRouter (NOT the China-hosted DeepSeek API): customer/financial
+  // data must not transit api.deepseek.com (data sovereignty + India regulatory
+  // risk; see docs/market-analysis.md §5). Point DEEPSEEK_BASE_URL at
+  // OpenRouter / Together / Gemini-compat / a self-host to choose your provider.
+  // NOTE: Settle never calls an LLM, so settlement data is unaffected regardless.
   DEEPSEEK_API_KEY: z.string().optional(),
-  DEEPSEEK_MODEL: z.string().default('deepseek-chat'),
-  DEEPSEEK_BASE_URL: z.string().url().default('https://api.deepseek.com'),
+  DEEPSEEK_MODEL: z.string().default('deepseek/deepseek-chat'),
+  DEEPSEEK_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
   GEMINI_API_KEY: z.string().optional(),
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),

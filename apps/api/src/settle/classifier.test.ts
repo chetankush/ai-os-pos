@@ -14,8 +14,10 @@ describe('classifyLabel', () => {
     ['Offer funding', 'discount'],
     ['Payment mechanism fee', 'payment_gateway'],
     ['Payment gateway charge', 'payment_gateway'],
+    ['Collection charges', 'payment_gateway'],
     ['Customer compensation/recoupment', 'refund'],
     ['Refund deduction', 'refund'],
+    ['Customer complaint deduction', 'refund'],
     ['Order cancellation charge', 'cancellation'],
     ['Tax collected at source (TCS)', 'tcs'],
     ['TDS 194O', 'tds'],
@@ -23,13 +25,31 @@ describe('classifyLabel', () => {
     ['Packaging charge', 'packaging'],
     ['Delivery fee recovery', 'delivery'],
     ['Fulfilment fee', 'delivery'],
+    ['Long distance fee', 'delivery'],
+    ['Logistics support fee', 'delivery'],
     ['Something unknown', 'other'],
+    // Broadened real-world coverage
+    ['Sponsored listing', 'ads'],
+    ['Visibility boost', 'ads'],
+    ['Access fee', 'service_fee'],
+    ['Convenience fee', 'service_fee'],
+    ['Swiggy Gold', 'discount'],
+    ['Coupon funding', 'discount'],
+    ['Customer delivery charge subsidy', 'discount'],
+    // Penalties (new category)
+    ['Order rejection penalty', 'penalty'],
+    ['SLA breach charge', 'penalty'],
+    ['Late dispatch fine', 'penalty'],
   ])('classifies "%s" as %s', (label, expected) => {
     expect(classifyLabel(label)).toBe(expected);
   });
 
   it('prioritizes ads over discount when a label contains both', () => {
     expect(classifyLabel('Ads with promo discount')).toBe('ads');
+  });
+
+  it('prioritizes penalty over cancellation for "cancellation penalty"', () => {
+    expect(classifyLabel('Cancellation penalty')).toBe('penalty');
   });
 
   it('prioritizes commission over generic service fee for "base service fee"', () => {
@@ -88,6 +108,16 @@ Ads,500`;
     const csv = `Commission,-1000`;
     const out = parseDeductionsCsv(csv);
     expect(out[0]?.amountPaise).toBe(1_000_00);
+  });
+
+  it('accepts a colon separator and "Rs"/"INR" currency prefixes', () => {
+    const csv = `Commission: Rs 22,000
+Ads: INR 5000`;
+    const out = parseDeductionsCsv(csv);
+    expect(out).toEqual([
+      { category: 'commission', label: 'Commission', amountPaise: 22_000_00 },
+      { category: 'ads', label: 'Ads', amountPaise: 5_000_00 },
+    ]);
   });
 
   it('returns an empty array for empty input', () => {

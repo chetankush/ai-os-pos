@@ -4,12 +4,15 @@ import type {
   MenuItem,
   Order,
   OrderItem,
+  OrderPayment,
   OrderStatsResponse,
   OrderStatus,
   OrderWithItems,
+  PaymentMethod,
 } from '@sangam/types';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AuditLogsRepository } from '../repositories/audit-logs.js';
 import type { CafesRepository } from '../repositories/cafes.js';
 import type { MenuRepository } from '../repositories/menu.js';
 import type { NewOrder, OrdersRepository } from '../repositories/orders.js';
@@ -149,6 +152,23 @@ function createMockOrdersRepo() {
       >(),
     findByOrderNumber:
       vi.fn<(orderNumber: string, cafeId: string) => Promise<OrderWithItems | null>>(),
+    settleWithPayments:
+      vi.fn<
+        (
+          id: string,
+          cafeId: string,
+          payments: { method: PaymentMethod; amountPaise: number }[],
+        ) => Promise<Order | null>
+      >(),
+    refund:
+      vi.fn<
+        (
+          id: string,
+          cafeId: string,
+          refund: { method: PaymentMethod; amountPaise: number; reason: string | null },
+        ) => Promise<Order | null>
+      >(),
+    listPayments: vi.fn<(id: string, cafeId: string) => Promise<OrderPayment[]>>(),
   } satisfies OrdersRepository;
 }
 
@@ -173,14 +193,17 @@ function createMockMenuRepo(menu: MenuCategoryWithItems[]): MenuRepository {
 describe('orders endpoints', () => {
   let app: FastifyInstance;
   let ordersRepo: ReturnType<typeof createMockOrdersRepo>;
+  let auditRepo: { list: ReturnType<typeof vi.fn>; record: ReturnType<typeof vi.fn> };
   let ownerToken: string;
 
   beforeAll(async () => {
     app = await buildTestApp({ SUPABASE_JWT_SECRET: JWT_SECRET });
     ordersRepo = createMockOrdersRepo();
+    auditRepo = { list: vi.fn(), record: vi.fn() };
     await app.register(ordersRoutes, {
       repository: ordersRepo,
       cafesRepository: createMockCafesRepo(makeCafe()),
+      auditRepository: auditRepo as unknown as AuditLogsRepository,
       menuRepository: createMockMenuRepo([
         {
           id: 'cat-1',
@@ -212,6 +235,10 @@ describe('orders endpoints', () => {
     ordersRepo.findByIdAndCafe.mockReset();
     ordersRepo.updateStatus.mockReset();
     ordersRepo.todayStats.mockReset();
+    ordersRepo.settleWithPayments.mockReset();
+    ordersRepo.refund.mockReset();
+    ordersRepo.listPayments.mockReset();
+    auditRepo.record.mockReset();
   });
 
   // ─── POST /cafes/:cafeId/orders ─────────────────────────────────────────────
@@ -559,6 +586,123 @@ describe('orders endpoints', () => {
       expect(call?.gstRateBp).toBe(0);
       expect(call?.taxPaise).toBe(0);
       await exApp.close();
+    });
+  });
+
+  describe('POST /cafes/:cafeId/orders/:orderId/settle (split tender)', () => {
+    it('settles an order with multiple tenders that sum to the total', async () => {
+      ordersRepo.findByIdAndCafe.mockResolvedValueOnce(makeOrderWithItems());
+      ordersRepo.settleWithPayments.mockResolvedValueOnce(
+        makeOrderWithItems({ status: 'completed', paymentStatus: 'paid' }),
+      );
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/settle`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: {
+          payments: [
+            { method: 'cash', amountPaise: 20000 },
+            { method: 'upi', amountPaise: 11500 },
+          ],
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(ordersRepo.settleWithPayments).toHaveBeenCalledWith(ORDER_ID, CAFE_ID, [
+        { method: 'cash', amountPaise: 20000 },
+        { method: 'upi', amountPaise: 11500 },
+      ]);
+    });
+
+    it('rejects tenders that do not sum to the bill total (400)', async () => {
+      ordersRepo.findByIdAndCafe.mockResolvedValueOnce(makeOrderWithItems());
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/settle`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { payments: [{ method: 'cash', amountPaise: 100 }] },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error.code).toBe('AMOUNT_MISMATCH');
+    });
+
+    it('rejects settling an already-paid order (409)', async () => {
+      ordersRepo.findByIdAndCafe.mockResolvedValueOnce(
+        makeOrderWithItems({ paymentStatus: 'paid' }),
+      );
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/settle`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { payments: [{ method: 'cash', amountPaise: 31500 }] },
+      });
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error.code).toBe('ALREADY_PAID');
+    });
+  });
+
+  describe('POST /cafes/:cafeId/orders/:orderId/refund', () => {
+    it('refunds a paid order and records an audit entry', async () => {
+      ordersRepo.findByIdAndCafe.mockResolvedValueOnce(
+        makeOrderWithItems({ paymentStatus: 'paid', paymentMethod: 'upi' }),
+      );
+      ordersRepo.refund.mockResolvedValueOnce(
+        makeOrderWithItems({ paymentStatus: 'refunded' }),
+      );
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/refund`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { method: 'upi', amountPaise: 31500, reason: 'spilled' },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(ordersRepo.refund).toHaveBeenCalledWith(ORDER_ID, CAFE_ID, {
+        method: 'upi',
+        amountPaise: 31500,
+        reason: 'spilled',
+      });
+      expect(auditRepo.record).toHaveBeenCalledTimes(1);
+      expect(auditRepo.record.mock.calls[0]?.[0]).toMatchObject({
+        action: 'order.refund',
+        entityId: ORDER_ID,
+      });
+    });
+
+    it('rejects refunding an unpaid order (400)', async () => {
+      ordersRepo.findByIdAndCafe.mockResolvedValueOnce(makeOrderWithItems());
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/refund`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { method: 'cash', amountPaise: 100 },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error.code).toBe('NOT_REFUNDABLE');
+      expect(ordersRepo.refund).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /cafes/:cafeId/orders/:orderId/payments', () => {
+    it('returns the tender ledger', async () => {
+      ordersRepo.listPayments.mockResolvedValueOnce([
+        {
+          id: 'p1',
+          cafeId: CAFE_ID,
+          orderId: ORDER_ID,
+          kind: 'payment',
+          method: 'cash',
+          amountPaise: 20000,
+          reason: null,
+          createdAt: '2026-05-21T00:00:00.000Z',
+        },
+      ]);
+      const res = await app.inject({
+        method: 'GET',
+        url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/payments`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().payments).toHaveLength(1);
+      expect(res.json().payments[0].method).toBe('cash');
     });
   });
 });

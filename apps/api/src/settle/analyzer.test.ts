@@ -116,6 +116,31 @@ describe('analyzeStatement', () => {
     });
   });
 
+  describe('PENALTY_DEDUCTION', () => {
+    it('flags penalties/fines as disputable and counts them as recoverable (not mandatory)', () => {
+      const stmt = baseStatement({
+        deductions: [
+          { category: 'commission', label: 'commission', amountPaise: 20_000_00 },
+          { category: 'penalty', label: 'Order rejection penalty', amountPaise: 1_200_00 },
+        ],
+      });
+      const r = analyzeStatement(stmt, { contractedCommissionRatePct: 20, adsConsented: true });
+      const f = r.findings.find((x) => x.code === 'PENALTY_DEDUCTION');
+      expect(f).toBeDefined();
+      expect(f?.amountPaise).toBe(1_200_00);
+      expect(f?.disputable).toBe(true);
+      expect(f?.severity).toBe('medium');
+      // penalty is recoverable, so it counts toward disputable and NOT mandatory
+      expect(r.disputablePaise).toBe(1_200_00);
+      expect(r.mandatoryDeductionsPaise).toBe(20_000_00);
+    });
+
+    it('does not add a penalty finding when there are no penalty deductions', () => {
+      const r = analyzeStatement(baseStatement(), {});
+      expect(r.findings.find((x) => x.code === 'PENALTY_DEDUCTION')).toBeUndefined();
+    });
+  });
+
   describe('HIGH_TAKE_RATE', () => {
     it('flags (non-disputable) when effective take rate exceeds 35%', () => {
       const high = baseStatement({

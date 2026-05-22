@@ -13,31 +13,54 @@ export function classifyLabel(label: string): SettleCategory {
   const l = label.toLowerCase();
   const has = (...needles: string[]) => needles.some((n) => l.includes(n));
 
-  if (has('advert', 'marketing', 'sponsor') || /\bads?\b/.test(l)) return 'ads';
-  if (has('commission', 'base service fee')) return 'commission';
-  if (has('service fee', 'service &', 'platform fee')) return 'service_fee';
-  if (has('discount', 'flat off', 'freebie', 'gold', 'promo', 'offer')) {
+  // Ads / sponsored visibility — the highest-leverage dispute. Checked first so
+  // an "ads ... promo" line isn't mistaken for a discount.
+  if (
+    has('advert', 'marketing', 'sponsor', 'promoted', 'listing', 'banner', 'boost') ||
+    /\bads?\b/.test(l)
+  ) {
+    return 'ads';
+  }
+  // Penalties / fines / SLA breaches — often wrongful, and disputable. Checked
+  // before cancellation so "cancellation penalty" is treated as a penalty.
+  if (has('penalt', 'breach', 'rejection') || /\bsla\b/.test(l) || /\bfine\b/.test(l)) {
+    return 'penalty';
+  }
+  if (has('commission', 'base service fee', 'take rate')) return 'commission';
+  if (
+    has('service fee', 'service &', 'platform fee', 'access fee', 'convenience fee', 'handling fee')
+  ) {
+    return 'service_fee';
+  }
+  if (
+    has('discount', 'flat off', 'freebie', 'gold', 'pro membership', 'promo', 'offer', 'coupon', 'subsidy')
+  ) {
     return 'discount';
   }
-  if (has('payment', 'gateway', 'mechanism')) return 'payment_gateway';
-  if (has('refund', 'compensation', 'recoup')) return 'refund';
+  if (has('payment', 'gateway', 'mechanism', 'collection charge', 'collection fee')) {
+    return 'payment_gateway';
+  }
+  if (has('refund', 'compensation', 'recoup', 'complaint')) return 'refund';
   if (has('cancel')) return 'cancellation';
   if (has('tcs', 'tax collected')) return 'tcs';
   if (has('tds', '194o', '194 o')) return 'tds';
   if (has('gst')) return 'gst';
   if (has('packag')) return 'packaging';
-  if (has('deliver', 'fulfil')) return 'delivery';
+  if (has('deliver', 'fulfil', 'logistics', 'rider', 'long distance', 'last mile')) {
+    return 'delivery';
+  }
   return 'other';
 }
 
 const LINE_RE =
-  /^(.*?)[,\t]\s*"?\s*₹?\s*\(?-?\s*([\d,]+(?:\.\d+)?)\s*\)?\s*"?\s*$/;
+  /^(.*?)[,\t:]\s*"?\s*(?:₹|rs\.?|inr)?\s*\(?-?\s*([\d,]+(?:\.\d+)?)\s*\)?\s*"?\s*$/i;
 
 /**
  * Parses a "label,amount" CSV (amount in rupees) into normalized deductions.
- * - Splits on the trailing numeric token so labels may contain commas.
- * - Strips ₹, quotes, and thousands separators; treats negatives/parens as
- *   positive magnitudes (deductions are stored as positive).
+ * - Splits on the trailing numeric token so labels may contain commas; accepts
+ *   comma, tab, or colon as the label/amount separator.
+ * - Strips ₹/Rs/INR, quotes, and thousands separators; treats negatives/parens
+ *   as positive magnitudes (deductions are stored as positive).
  * - Skips header rows and any line without a numeric amount.
  */
 export function parseDeductionsCsv(csv: string): SettleDeduction[] {

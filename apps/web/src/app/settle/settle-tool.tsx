@@ -317,8 +317,17 @@ export function SettleTool() {
                 <button
                   type="button"
                   onClick={() => {
+                    // Fill a COMPLETE, finding-rich sample so the demo is one
+                    // click → result (gross + a 20% contracted rate so the 22%
+                    // commission also flags as an overcharge). Was: deductions
+                    // only, which left the required Gross sales empty.
                     setDeductions(SAMPLE);
-                    if (deductionsError) setDeductionsError(null);
+                    setGrossSales('100000');
+                    setOrderCount('100');
+                    setCommissionRate('20');
+                    setGrossError(null);
+                    setDeductionsError(null);
+                    setFormError(null);
                   }}
                   className={cn(
                     'inline-flex items-center gap-1.5 -mr-1.5 -mb-1.5 px-2 min-h-9 rounded-md',

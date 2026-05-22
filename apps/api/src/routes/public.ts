@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { askWaiter } from '../ai/waiter.js';
 import { cacheKey, getCache } from '../lib/cache.js';
-import { OrderBuildError, buildOrder } from '../orders/build.js';
+import { OrderBuildError, buildOrder, gstRateBpFor } from '../orders/build.js';
 import { createDrizzleCafesRepo, type CafesRepository } from '../repositories/cafes.js';
 import { createDrizzleMenuRepo, type MenuRepository } from '../repositories/menu.js';
 import { createDrizzleOrdersRepo, type NewOrder, type OrdersRepository } from '../repositories/orders.js';
@@ -90,6 +90,7 @@ export async function publicRoutes(
         city: cafe.city,
         onlinePaymentEnabled,
         prepaidRequired: cafe.qrPrepaidRequired,
+        gstRateBp: gstRateBpFor(cafe.gstMode),
       },
       categories,
     };
