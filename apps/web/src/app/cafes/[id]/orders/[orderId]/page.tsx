@@ -1,8 +1,11 @@
 import type {
   CafeResponse,
   OrderItem,
+  OrderPayment,
+  OrderPaymentsResponse,
   OrderResponse,
   OrderStatus,
+  PaymentMethod,
 } from '@sangam/types';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -28,15 +31,24 @@ const SOURCE_LABEL: Record<string, string> = {
   phone: 'Phone',
 };
 
+const PAY_LABEL: Record<PaymentMethod, string> = {
+  cash: 'Cash',
+  upi: 'UPI',
+  card: 'Card',
+  online: 'Online',
+};
+
 export default async function OrderDetailPage({ params }: PageProps) {
   const { id, orderId } = await params;
 
   let data: OrderResponse;
   let cafeData: CafeResponse;
+  let paymentsData: OrderPaymentsResponse;
   try {
-    [data, cafeData] = await Promise.all([
+    [data, cafeData, paymentsData] = await Promise.all([
       serverFetch<OrderResponse>(`/cafes/${id}/orders/${orderId}`),
       serverFetch<CafeResponse>(`/cafes/${id}`),
+      serverFetch<OrderPaymentsResponse>(`/cafes/${id}/orders/${orderId}/payments`),
     ]);
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) notFound();
@@ -44,6 +56,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
   }
 
   const order = data.order;
+  const payments = paymentsData.payments;
   const cafe = cafeData.cafe;
   const sourceLabel = SOURCE_LABEL[order.source] ?? order.source;
   const customerLabel = order.customerName?.trim() || 'Walk-in';
@@ -88,7 +101,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
                 method={order.paymentMethod}
               />
             </div>
-            <PrintViews order={order} cafe={cafe} />
+            <PrintViews order={order} cafe={cafe} payments={payments} />
           </div>
         </div>
       </FadeIn>
@@ -197,6 +210,23 @@ export default async function OrderDetailPage({ params }: PageProps) {
                     })}
                   </p>
                 )}
+
+                {payments.length > 0 && (
+                  <div className="mt-1 space-y-1 border-t border-border pt-3">
+                    <p className="text-[11px] uppercase tracking-wider text-muted font-medium">
+                      Tender
+                    </p>
+                    {payments.map((p: OrderPayment) => (
+                      <SummaryRow
+                        key={p.id}
+                        label={`${p.kind === 'refund' ? 'Refund · ' : ''}${PAY_LABEL[p.method]}${
+                          p.reason ? ` (${p.reason})` : ''
+                        }`}
+                        value={`${p.kind === 'refund' ? '− ' : ''}${formatRupees(p.amountPaise)}`}
+                      />
+                    ))}
+                  </div>
+                )}
               </CardBody>
             </Card>
 
@@ -206,6 +236,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
                 orderId={orderId}
                 initialStatus={order.status}
                 alreadyPaid={order.paymentStatus === 'paid'}
+                paymentStatus={order.paymentStatus}
+                totalPaise={order.totalPaise}
               />
             </Card>
           </div>

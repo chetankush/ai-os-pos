@@ -1,6 +1,6 @@
 'use client';
 
-import type { Cafe, OrderItem, OrderWithItems } from '@sangam/types';
+import type { Cafe, OrderItem, OrderPayment, OrderWithItems } from '@sangam/types';
 import { useState } from 'react';
 import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ type Mode = 'kot' | 'bill' | null;
 interface PrintViewsProps {
   order: OrderWithItems;
   cafe: Cafe;
+  payments?: OrderPayment[];
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -19,7 +20,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   online: 'Online',
 };
 
-export function PrintViews({ order, cafe }: PrintViewsProps) {
+export function PrintViews({ order, cafe, payments = [] }: PrintViewsProps) {
   const [mode, setMode] = useState<Mode>(null);
 
   function print(next: Exclude<Mode, null>) {
@@ -51,7 +52,7 @@ export function PrintViews({ order, cafe }: PrintViewsProps) {
       */}
       <div className="fixed inset-0 z-[999] hidden bg-white text-black print:block">
         {mode === 'kot' && <Kot order={order} />}
-        {mode === 'bill' && <Bill order={order} cafe={cafe} />}
+        {mode === 'bill' && <Bill order={order} cafe={cafe} payments={payments} />}
       </div>
     </>
   );
@@ -104,7 +105,15 @@ function Kot({ order }: { order: OrderWithItems }) {
 
 // ─── Bill / GST invoice — full money ────────────────────────────────────────
 
-function Bill({ order, cafe }: { order: OrderWithItems; cafe: Cafe }) {
+function Bill({
+  order,
+  cafe,
+  payments,
+}: {
+  order: OrderWithItems;
+  cafe: Cafe;
+  payments: OrderPayment[];
+}) {
   // Split GST in half (intra-state convention) so CGST + SGST === taxPaise.
   const cgstPaise = Math.floor(order.taxPaise / 2);
   const sgstPaise = order.taxPaise - cgstPaise;
@@ -216,8 +225,18 @@ function Bill({ order, cafe }: { order: OrderWithItems; cafe: Cafe }) {
         </span>
       </div>
 
-      {paymentLabel && (
-        <p className="mt-1 text-center">Paid via {paymentLabel}</p>
+      {payments.length > 0 ? (
+        <div className="mt-1">
+          {payments.map((p) => (
+            <Row
+              key={p.id}
+              label={`${p.kind === 'refund' ? 'Refund ' : 'Paid '}${PAYMENT_LABELS[p.method] ?? p.method}`}
+              value={`${p.kind === 'refund' ? '- ' : ''}${formatRupees(p.amountPaise)}`}
+            />
+          ))}
+        </div>
+      ) : (
+        paymentLabel && <p className="mt-1 text-center">Paid via {paymentLabel}</p>
       )}
 
       <Divider />
