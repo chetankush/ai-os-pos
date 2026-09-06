@@ -6,6 +6,7 @@ import type {
   AiConsoleMessage,
   Cafe,
   GstMode,
+  InventoryItem,
   MenuCategory,
   MenuCategoryWithItems,
   MenuItem,
@@ -16,14 +17,14 @@ import type {
   PaymentMethod,
   PaymentStatus,
   RestaurantTable,
+  SettleConfig,
+  SettleReport,
+  SettleStatement,
   TableHistory,
   TableSession,
   TableSessionDetail,
   TableShape,
   TableWithStatus,
-  SettleConfig,
-  SettleReport,
-  SettleStatement,
 } from './domain.js';
 
 export interface ApiError {
@@ -102,6 +103,8 @@ export interface CreateMenuItemRequest {
   name: string;
   description?: string;
   basePricePaise: number;
+  hsnCode?: string;
+  gstRateBpOverride?: number;
   imageUrl?: string;
   isVegetarian?: boolean;
   isVegan?: boolean;
@@ -114,6 +117,8 @@ export interface UpdateMenuItemRequest {
   name?: string;
   description?: string | null;
   basePricePaise?: number;
+  hsnCode?: string | null;
+  gstRateBpOverride?: number | null;
   imageUrl?: string | null;
   isVegetarian?: boolean;
   isVegan?: boolean;
@@ -130,6 +135,48 @@ export interface MenuCategoryResponse {
 
 export interface MenuItemResponse {
   item: MenuItem;
+}
+
+/** Bulk import: paste/upload a CSV of menu rows. */
+export interface MenuImportRequest {
+  csv: string;
+}
+
+export interface MenuImportError {
+  /** 1-based line number in the source CSV (header = line 1). */
+  line: number;
+  message: string;
+}
+
+export interface MenuImportResponse {
+  categoriesCreated: number;
+  itemsCreated: number;
+  /** Rows that failed validation and were not imported. */
+  skipped: number;
+  errors: MenuImportError[];
+}
+
+// ─── Inventory ────────────────────────────────────────────────────────────────
+
+export interface InventoryListResponse {
+  items: InventoryItem[];
+}
+
+export interface InventoryItemResponse {
+  item: InventoryItem;
+}
+
+/** Set stock level and/or low-stock threshold for a menu item. */
+export interface UpdateInventoryRequest {
+  /** null clears tracking (item becomes untracked / unlimited). */
+  stockQty?: number | null;
+  /** null clears the low-stock warning. */
+  lowStockThreshold?: number | null;
+}
+
+/** Add stock to a menu item (increments current quantity). */
+export interface RestockInventoryRequest {
+  addQty: number;
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
@@ -159,6 +206,14 @@ export interface OrderResponse {
 
 export interface OrdersListResponse {
   orders: Order[];
+}
+
+/**
+ * Active kitchen tickets — orders still being made (pending/preparing/ready),
+ * oldest-first, each with its line items. Powers the Kitchen Display (KDS).
+ */
+export interface KitchenTicketsResponse {
+  tickets: OrderWithItems[];
 }
 
 export interface OrderStatsResponse {

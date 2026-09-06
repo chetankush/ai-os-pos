@@ -1,7 +1,7 @@
-import Link from 'next/link';
 import { buttonClasses } from '@/components/ui/button';
 import { TriquetraMark } from '@/components/ui/logo';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import Link from 'next/link';
 
 const NAV = [
   { href: '/pricing', label: 'Pricing' },
@@ -40,9 +40,12 @@ export default function MarketingLayout({
             <ThemeToggle />
             <Link
               href="/login"
-              className={buttonClasses({ variant: 'primary', size: 'sm' })}
+              className="rounded-md px-2 py-2 text-sm text-muted transition-colors hover:bg-subtle hover:text-fg sm:px-3"
             >
               Sign in
+            </Link>
+            <Link href="/signup" className={buttonClasses({ variant: 'primary', size: 'sm' })}>
+              Get started
             </Link>
           </div>
         </div>
@@ -56,16 +59,12 @@ export default function MarketingLayout({
           <div className="flex flex-col gap-10 sm:flex-row sm:justify-between">
             <div className="max-w-xs space-y-3">
               <Link href="/pricing" className="inline-flex items-center gap-2">
-                <span className="grid size-7 place-items-center rounded-lg bg-accent text-xs font-bold text-accent-fg">
-                  S
-                </span>
-                <span className="text-base font-semibold tracking-tight">
-                  Sangam
-                </span>
+                <TriquetraMark className="size-7 shrink-0 text-accent" />
+                <span className="text-base font-semibold tracking-tight">Sangam</span>
               </Link>
               <p className="text-sm leading-relaxed text-muted">
-                The AI-native POS built for Indian restaurants, cafes & cloud
-                kitchens — affordable, fast, and your data stays yours.
+                The AI-native POS built for Indian restaurants, cafes & cloud kitchens — affordable,
+                fast, and your data stays yours.
               </p>
             </div>
 
@@ -76,16 +75,14 @@ export default function MarketingLayout({
               </FooterCol>
               <FooterCol title="Company">
                 <FooterLink href="/about">About</FooterLink>
+                <FooterLink href="/signup">Get started</FooterLink>
                 <FooterLink href="/login">Sign in</FooterLink>
               </FooterCol>
             </div>
           </div>
 
           <div className="mt-10 flex flex-col gap-2 border-t border-border pt-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              © {new Date().getFullYear()} Sangam · Built for Indian restaurants
-              & cafes
-            </span>
+            <span>© {new Date().getFullYear()} Sangam · Built for Indian restaurants & cafes</span>
             <span className="font-mono">v0.0.1</span>
           </div>
         </div>
@@ -103,9 +100,7 @@ function FooterCol({
 }) {
   return (
     <div className="space-y-3">
-      <p className="text-[11px] font-medium uppercase tracking-wider text-muted">
-        {title}
-      </p>
+      <p className="text-[11px] font-medium uppercase tracking-wider text-muted">{title}</p>
       <ul className="space-y-2">{children}</ul>
     </div>
   );

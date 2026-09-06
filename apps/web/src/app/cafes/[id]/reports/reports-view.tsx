@@ -110,7 +110,16 @@ export function ReportsView({ cafeId }: Props) {
             type="date"
             value={date}
             max={todayIstDate()}
-            onChange={(e) => setDate(e.target.value || todayIstDate())}
+            onChange={(e) => {
+              // Ignore the transient empty value the spinbutton emits while
+              // the user is mid-keystroke — falling back to today on every
+              // empty event snapped the displayed date back as they typed.
+              if (e.target.value) setDate(e.target.value);
+            }}
+            onBlur={(e) => {
+              // If they cleared and walked away, restore to today.
+              if (!e.target.value) setDate(todayIstDate());
+            }}
             className={cn(
               'h-9 rounded-lg border border-border bg-bg px-3 text-sm text-fg',
               'outline-none focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2 focus-visible:ring-offset-bg',

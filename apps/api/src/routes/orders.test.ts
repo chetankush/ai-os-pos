@@ -12,11 +12,11 @@ import type {
 } from '@sangam/types';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildTestApp } from '../../test/helpers.js';
 import type { AuditLogsRepository } from '../repositories/audit-logs.js';
 import type { CafesRepository } from '../repositories/cafes.js';
 import type { MenuRepository } from '../repositories/menu.js';
 import type { NewOrder, OrdersRepository } from '../repositories/orders.js';
-import { buildTestApp } from '../../test/helpers.js';
 import { ordersRoutes } from './orders.js';
 
 const JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
@@ -59,6 +59,8 @@ function makeMenuItem(overrides: Partial<MenuItem> = {}): MenuItem {
     name: 'Cappuccino',
     description: null,
     basePricePaise: 15000,
+    hsnCode: null,
+    gstRateBpOverride: null,
     imageUrl: null,
     isVegetarian: true,
     isVegan: false,
@@ -126,10 +128,11 @@ function createMockOrdersRepo() {
   return {
     create: vi.fn<(d: NewOrder) => Promise<OrderWithItems>>(),
     listByCafe: vi.fn<(cafeId: string, limit?: number) => Promise<Order[]>>(),
-    listBySession:
-      vi.fn<(sessionId: string, cafeId: string) => Promise<OrderWithItems[]>>(),
+    listBySession: vi.fn<(sessionId: string, cafeId: string) => Promise<OrderWithItems[]>>(),
+    listKitchenTickets: vi.fn<(cafeId: string) => Promise<OrderWithItems[]>>(),
     findByIdAndCafe: vi.fn<(id: string, cafeId: string) => Promise<OrderWithItems | null>>(),
-    updateStatus: vi.fn<(id: string, cafeId: string, status: OrderStatus) => Promise<Order | null>>(),
+    updateStatus:
+      vi.fn<(id: string, cafeId: string, status: OrderStatus) => Promise<Order | null>>(),
     todayStats: vi.fn<(cafeId: string) => Promise<OrderStatsResponse>>(),
     setPaymentPending:
       vi.fn<(id: string, cafeId: string, providerOrderId: string) => Promise<Order | null>>(),
@@ -222,7 +225,10 @@ describe('orders endpoints', () => {
     });
     await app.ready();
 
-    ownerToken = app.jwt.sign({ sub: OWNER_ID, email: 'owner@test.in', aud: 'authenticated' }, { expiresIn: '1h' });
+    ownerToken = app.jwt.sign(
+      { sub: OWNER_ID, email: 'owner@test.in', aud: 'authenticated' },
+      { expiresIn: '1h' },
+    );
   });
 
   afterAll(async () => {
@@ -232,6 +238,7 @@ describe('orders endpoints', () => {
   beforeEach(() => {
     ordersRepo.create.mockReset();
     ordersRepo.listByCafe.mockReset();
+    ordersRepo.listKitchenTickets.mockReset();
     ordersRepo.findByIdAndCafe.mockReset();
     ordersRepo.updateStatus.mockReset();
     ordersRepo.todayStats.mockReset();
@@ -314,9 +321,7 @@ describe('orders endpoints', () => {
         url: `/cafes/${CAFE_ID}/orders`,
         headers: { authorization: `Bearer ${ownerToken}` },
         payload: {
-          items: [
-            { menuItemId: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', quantity: 1 },
-          ],
+          items: [{ menuItemId: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', quantity: 1 }],
         },
       });
       expect(res.statusCode).toBe(400);
@@ -358,6 +363,56 @@ describe('orders endpoints', () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.json().orders).toHaveLength(1);
+    });
+  });
+
+  // ─── GET /cafes/:cafeId/kitchen/tickets ─────────────────────────────────────
+
+  describe('GET /cafes/:cafeId/kitchen/tickets', () => {
+    it('returns active kitchen tickets with items', async () => {
+      ordersRepo.listKitchenTickets.mockResolvedValueOnce([
+        makeOrderWithItems({ status: 'pending' }),
+        makeOrderWithItems({ id: 'cccccccc-cccc-cccc-cccc-cccccccccccd', status: 'preparing' }),
+      ]);
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/cafes/${CAFE_ID}/kitchen/tickets`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().tickets).toHaveLength(2);
+      expect(res.json().tickets[0].items).toHaveLength(1);
+      expect(ordersRepo.listKitchenTickets).toHaveBeenCalledWith(CAFE_ID);
+    });
+
+    it('returns 404 for a cafe the user does not own', async () => {
+      const app2 = await buildTestApp({ SUPABASE_JWT_SECRET: JWT_SECRET });
+      const repo = createMockOrdersRepo();
+      await app2.register(ordersRoutes, {
+        repository: repo,
+        cafesRepository: createMockCafesRepo(null),
+        menuRepository: createMockMenuRepo([]),
+      });
+      await app2.ready();
+
+      const res = await app2.inject({
+        method: 'GET',
+        url: `/cafes/${CAFE_ID}/kitchen/tickets`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+      });
+      expect(res.statusCode).toBe(404);
+      expect(repo.listKitchenTickets).not.toHaveBeenCalled();
+      await app2.close();
+    });
+
+    it('requires authentication', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: `/cafes/${CAFE_ID}/kitchen/tickets`,
+      });
+      expect(res.statusCode).toBe(401);
     });
   });
 
@@ -449,12 +504,7 @@ describe('orders endpoints', () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.json().order.paymentMethod).toBe('upi');
-      expect(ordersRepo.updateStatus).toHaveBeenCalledWith(
-        ORDER_ID,
-        CAFE_ID,
-        'completed',
-        'upi',
-      );
+      expect(ordersRepo.updateStatus).toHaveBeenCalledWith(ORDER_ID, CAFE_ID, 'completed', 'upi');
     });
 
     it('rejects an invalid payment method', async () => {
@@ -555,7 +605,9 @@ describe('orders endpoints', () => {
 
     it('composition charges no GST on the bill', async () => {
       const { app: compApp, repo } = await buildAppForMode('composition');
-      repo.create.mockResolvedValueOnce(makeOrderWithItems({ gstRateBp: 0, taxPaise: 0, totalPaise: 15000 }));
+      repo.create.mockResolvedValueOnce(
+        makeOrderWithItems({ gstRateBp: 0, taxPaise: 0, totalPaise: 15000 }),
+      );
 
       await compApp.inject({
         method: 'POST',
@@ -573,7 +625,9 @@ describe('orders endpoints', () => {
 
     it('exempt charges no GST on the bill', async () => {
       const { app: exApp, repo } = await buildAppForMode('exempt');
-      repo.create.mockResolvedValueOnce(makeOrderWithItems({ gstRateBp: 0, taxPaise: 0, totalPaise: 15000 }));
+      repo.create.mockResolvedValueOnce(
+        makeOrderWithItems({ gstRateBp: 0, taxPaise: 0, totalPaise: 15000 }),
+      );
 
       await exApp.inject({
         method: 'POST',
@@ -645,9 +699,7 @@ describe('orders endpoints', () => {
       ordersRepo.findByIdAndCafe.mockResolvedValueOnce(
         makeOrderWithItems({ paymentStatus: 'paid', paymentMethod: 'upi' }),
       );
-      ordersRepo.refund.mockResolvedValueOnce(
-        makeOrderWithItems({ paymentStatus: 'refunded' }),
-      );
+      ordersRepo.refund.mockResolvedValueOnce(makeOrderWithItems({ paymentStatus: 'refunded' }));
       const res = await app.inject({
         method: 'POST',
         url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/refund`,

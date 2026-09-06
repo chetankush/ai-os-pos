@@ -1,4 +1,4 @@
-import { schema, type Database } from '@sangam/db';
+import { type Database, schema } from '@sangam/db';
 import type { MenuCategory, MenuCategoryWithItems, MenuItem } from '@sangam/types';
 import { and, asc, eq } from 'drizzle-orm';
 
@@ -14,6 +14,8 @@ export interface NewMenuItem {
   name: string;
   description: string | null;
   basePricePaise: number;
+  hsnCode: string | null;
+  gstRateBpOverride: number | null;
   imageUrl: string | null;
   isVegetarian: boolean;
   isVegan: boolean;
@@ -26,6 +28,8 @@ export interface UpdateMenuItem {
   name?: string;
   description?: string | null;
   basePricePaise?: number;
+  hsnCode?: string | null;
+  gstRateBpOverride?: number | null;
   imageUrl?: string | null;
   isVegetarian?: boolean;
   isVegan?: boolean;
@@ -42,11 +46,7 @@ export interface MenuRepository {
   categoryExists(categoryId: string, cafeId: string): Promise<boolean>;
   createCategory(data: NewMenuCategory): Promise<MenuCategory>;
   createItem(data: NewMenuItem): Promise<MenuItem>;
-  updateItem(
-    itemId: string,
-    cafeId: string,
-    patch: UpdateMenuItem,
-  ): Promise<MenuItem | null>;
+  updateItem(itemId: string, cafeId: string, patch: UpdateMenuItem): Promise<MenuItem | null>;
   deleteItem(itemId: string, cafeId: string): Promise<boolean>;
 }
 
@@ -84,10 +84,7 @@ export function createDrizzleMenuRepo(db: Database): MenuRepository {
         .select({ id: schema.menuCategories.id })
         .from(schema.menuCategories)
         .where(
-          and(
-            eq(schema.menuCategories.id, categoryId),
-            eq(schema.menuCategories.cafeId, cafeId),
-          ),
+          and(eq(schema.menuCategories.id, categoryId), eq(schema.menuCategories.cafeId, cafeId)),
         )
         .limit(1);
       return row != null;

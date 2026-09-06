@@ -78,6 +78,13 @@
       "when": 1779311923396,
       "tag": "0010_woozy_kingpin",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1780125061694,
+      "tag": "0011_medical_warbound",
+      "breakpoints": true
     }
   ]
 }

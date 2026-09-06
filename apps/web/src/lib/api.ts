@@ -26,11 +26,7 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
-async function request<T>(
-  method: string,
-  path: string,
-  opts: RequestOptions = {},
-): Promise<T> {
+async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {};
 
   if (opts.body !== undefined) {
@@ -78,17 +74,31 @@ export function listCafes(token: string, signal?: AbortSignal): Promise<CafesLis
   return request<CafesListResponse>('GET', '/cafes', { token, signal });
 }
 
-export function getCafe(
-  token: string,
-  id: string,
-  signal?: AbortSignal,
-): Promise<CafeResponse> {
+export function getCafe(token: string, id: string, signal?: AbortSignal): Promise<CafeResponse> {
   return request<CafeResponse>('GET', `/cafes/${id}`, { token, signal });
 }
 
-export function createCafe(
-  token: string,
-  data: CreateCafeRequest,
-): Promise<CafeResponse> {
+export function createCafe(token: string, data: CreateCafeRequest): Promise<CafeResponse> {
   return request<CafeResponse>('POST', '/cafes', { token, body: data });
+}
+
+// ─── Auth ───────────────────────────────────────────────────────────────────
+
+export interface SignupRequest {
+  email: string;
+  password: string;
+  fullName?: string;
+}
+
+export interface SignupResponse {
+  user: { id: string; email: string };
+}
+
+/**
+ * Creates a Supabase user via the API (server-side admin call, email auto-
+ * confirmed). The browser then logs in immediately via the Supabase password
+ * grant — no inbox round-trip required.
+ */
+export function signup(data: SignupRequest): Promise<SignupResponse> {
+  return request<SignupResponse>('POST', '/auth/signup', { body: data });
 }

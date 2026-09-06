@@ -1,19 +1,20 @@
 'use client';
 
+import { Button, buttonClasses } from '@/components/ui/button';
+import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { ImageUpload } from '@/components/ui/image-upload';
+import { Input } from '@/components/ui/input';
+import { Field } from '@/components/ui/label';
+import { FadeIn } from '@/components/ui/motion';
+import { cn } from '@/lib/cn';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { MenuCategoryWithItems, MenuItem } from '@sangam/types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Flame, Leaf, Pencil, Plus, ScrollText, Trash2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { Button, buttonClasses } from '@/components/ui/button';
-import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { ImageUpload } from '@/components/ui/image-upload';
-import { Field } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { FadeIn } from '@/components/ui/motion';
-import { cn } from '@/lib/cn';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { MenuImport } from './menu-import';
 
 interface Props {
   cafeId: string;
@@ -23,6 +24,24 @@ interface Props {
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 const SPICE_LEVELS = ['None', 'Mild', 'Medium', 'Hot'] as const;
+
+/** basis points → percent string for display in inputs (e.g. 1800 → "18"). */
+function bpToPercentStr(bp: number | null): string {
+  if (bp == null) return '';
+  return (bp / 100).toString();
+}
+
+/**
+ * Parse a percent string into a basis-point override.
+ * Empty → null (use cafe default). Returns `undefined` if invalid (0–28% range).
+ */
+function percentStrToBp(value: string): number | null | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const pct = Number(trimmed);
+  if (!Number.isFinite(pct) || pct < 0 || pct > 28) return undefined;
+  return Math.round(pct * 100);
+}
 
 async function authedFetch(path: string, init: RequestInit = {}) {
   const supabase = createSupabaseBrowserClient();
@@ -42,10 +61,36 @@ async function authedFetch(path: string, init: RequestInit = {}) {
   return res.json();
 }
 
+async function getAccessToken(): Promise<string | null> {
+  const supabase = createSupabaseBrowserClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
+}
+
 export function MenuEditor({ cafeId, initialCategories }: Props) {
   const [categories, setCategories] = useState(initialCategories);
   const [showAddCategory, setShowAddCategory] = useState(categories.length === 0);
   const [addingItemFor, setAddingItemFor] = useState<string | null>(null);
+
+  async function refreshMenu() {
+    try {
+      const data = await authedFetch(`/cafes/${cafeId}/menu`);
+      if (data?.categories) {
+        setCategories(data.categories);
+        setShowAddCategory(false);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to refresh menu');
+    }
+  }
+
+  const toolbar = (
+    <div className="flex items-center justify-end">
+      <MenuImport cafeId={cafeId} getAccessToken={getAccessToken} onImported={refreshMenu} />
+    </div>
+  );
 
   function addCategory(category: MenuCategoryWithItems) {
     setCategories((prev) => [...prev, { ...category, items: [] }]);
@@ -54,9 +99,7 @@ export function MenuEditor({ cafeId, initialCategories }: Props) {
 
   function addItem(categoryId: string, item: MenuItem) {
     setCategories((prev) =>
-      prev.map((c) =>
-        c.id === categoryId ? { ...c, items: [...c.items, item] } : c,
-      ),
+      prev.map((c) => (c.id === categoryId ? { ...c, items: [...c.items, item] } : c)),
     );
     setAddingItemFor(null);
   }
@@ -78,26 +121,30 @@ export function MenuEditor({ cafeId, initialCategories }: Props) {
 
   if (categories.length === 0 && !showAddCategory) {
     return (
-      <Card className="p-12 text-center border-dashed">
-        <div className="mx-auto size-12 rounded-lg bg-subtle border border-border grid place-items-center">
-          <ScrollText className="size-5 text-muted" />
-        </div>
-        <h3 className="mt-4 font-medium">No menu items yet</h3>
-        <p className="mt-1 text-sm text-muted">
-          Create your first category, then add items to it.
-        </p>
-        <div className="mt-6">
-          <Button onClick={() => setShowAddCategory(true)}>
-            <Plus className="size-4" />
-            Create first category
-          </Button>
-        </div>
-      </Card>
+      <div className="space-y-4">
+        {toolbar}
+        <Card className="p-12 text-center border-dashed">
+          <div className="mx-auto size-12 rounded-lg bg-subtle border border-border grid place-items-center">
+            <ScrollText className="size-5 text-muted" />
+          </div>
+          <h3 className="mt-4 font-medium">No menu items yet</h3>
+          <p className="mt-1 text-sm text-muted">
+            Create your first category, then add items to it.
+          </p>
+          <div className="mt-6">
+            <Button onClick={() => setShowAddCategory(true)}>
+              <Plus className="size-4" />
+              Create first category
+            </Button>
+          </div>
+        </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {toolbar}
       <AnimatePresence>
         {categories.map((cat) => (
           <motion.div
@@ -113,16 +160,13 @@ export function MenuEditor({ cafeId, initialCategories }: Props) {
                 <div>
                   <CardTitle>{cat.name}</CardTitle>
                   <p className="text-xs text-muted mt-1">
-                    {cat.items.length}{' '}
-                    {cat.items.length === 1 ? 'item' : 'items'}
+                    {cat.items.length} {cat.items.length === 1 ? 'item' : 'items'}
                   </p>
                 </div>
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() =>
-                    setAddingItemFor((id) => (id === cat.id ? null : cat.id))
-                  }
+                  onClick={() => setAddingItemFor((id) => (id === cat.id ? null : cat.id))}
                 >
                   <Plus className="size-3.5" />
                   Add item
@@ -233,9 +277,7 @@ function ItemRow({
           method: 'PATCH',
           body: JSON.stringify({ isAvailable: next }),
         });
-        toast.success(
-          next ? `${item.name} is now available` : `${item.name} marked unavailable`,
-        );
+        toast.success(next ? `${item.name} is now available` : `${item.name} marked unavailable`);
       } catch (err) {
         onChange({ isAvailable: !next }); // revert
         toast.error(err instanceof Error ? err.message : 'Failed to update item');
@@ -311,6 +353,20 @@ function ItemRow({
           </div>
           {item.description && (
             <p className="mt-0.5 text-xs text-muted truncate">{item.description}</p>
+          )}
+          {(item.hsnCode || item.gstRateBpOverride != null) && (
+            <p className="mt-0.5 flex items-center gap-2 text-[11px] text-muted tabular-nums">
+              {item.hsnCode && <span>HSN {item.hsnCode}</span>}
+              {item.gstRateBpOverride != null && (
+                <span>
+                  GST{' '}
+                  {(item.gstRateBpOverride / 100).toFixed(
+                    item.gstRateBpOverride % 100 === 0 ? 0 : 2,
+                  )}
+                  %
+                </span>
+              )}
+            </p>
           )}
         </div>
 
@@ -417,10 +473,10 @@ function EditItemForm({
   onCancel: () => void;
 }) {
   const [name, setName] = useState(item.name);
-  const [priceRupees, setPriceRupees] = useState(
-    (item.basePricePaise / 100).toString(),
-  );
+  const [priceRupees, setPriceRupees] = useState((item.basePricePaise / 100).toString());
   const [description, setDescription] = useState(item.description ?? '');
+  const [hsnCode, setHsnCode] = useState(item.hsnCode ?? '');
+  const [gstPercent, setGstPercent] = useState(bpToPercentStr(item.gstRateBpOverride));
   const [isVeg, setIsVeg] = useState(item.isVegetarian);
   const [isVegan, setIsVegan] = useState(item.isVegan);
   const [containsEgg, setContainsEgg] = useState(item.containsEgg);
@@ -445,10 +501,24 @@ function EditItemForm({
       return;
     }
 
+    const trimmedHsn = hsnCode.trim();
+    if (trimmedHsn && !/^\d{1,8}$/.test(trimmedHsn)) {
+      setError('HSN/SAC must be up to 8 digits');
+      return;
+    }
+
+    const gstBp = percentStrToBp(gstPercent);
+    if (gstBp === undefined) {
+      setError('Enter a GST rate between 0 and 28%');
+      return;
+    }
+
     const patch: Partial<MenuItem> = {
       name: trimmedName,
       basePricePaise: Math.round(rupees * 100),
       description: description.trim() || null,
+      hsnCode: trimmedHsn || null,
+      gstRateBpOverride: gstBp,
       isVegetarian: isVeg,
       isVegan,
       containsEgg,
@@ -509,6 +579,35 @@ function EditItemForm({
             maxLength={500}
           />
         </Field>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="HSN/SAC code" hint="Optional" htmlFor={`edit-hsn-${item.id}`}>
+            <Input
+              id={`edit-hsn-${item.id}`}
+              inputMode="numeric"
+              placeholder="996331"
+              value={hsnCode}
+              onChange={(e) => setHsnCode(e.target.value)}
+              maxLength={8}
+            />
+          </Field>
+          <Field
+            label="GST override (%)"
+            hint="Blank = cafe default"
+            htmlFor={`edit-gst-${item.id}`}
+          >
+            <Input
+              id={`edit-gst-${item.id}`}
+              type="number"
+              min="0"
+              max="28"
+              step="0.5"
+              placeholder="18"
+              value={gstPercent}
+              onChange={(e) => setGstPercent(e.target.value)}
+            />
+          </Field>
+        </div>
 
         <Field label="Photo" hint="Optional">
           <ImageUpload value={imageUrl} onChange={setImageUrl} shape="wide" />
@@ -690,6 +789,8 @@ function AddItemForm({
   const [name, setName] = useState('');
   const [priceRupees, setPriceRupees] = useState('');
   const [description, setDescription] = useState('');
+  const [hsnCode, setHsnCode] = useState('');
+  const [gstPercent, setGstPercent] = useState('');
   const [isVeg, setIsVeg] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -704,6 +805,18 @@ function AddItemForm({
       return;
     }
 
+    const trimmedHsn = hsnCode.trim();
+    if (trimmedHsn && !/^\d{1,8}$/.test(trimmedHsn)) {
+      setError('HSN/SAC must be up to 8 digits');
+      return;
+    }
+
+    const gstBp = percentStrToBp(gstPercent);
+    if (gstBp === undefined) {
+      setError('Enter a GST rate between 0 and 28%');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const data = await authedFetch(`/cafes/${cafeId}/menu/items`, {
@@ -713,6 +826,8 @@ function AddItemForm({
           name: name.trim(),
           basePricePaise: Math.round(rupees * 100),
           description: description.trim() || undefined,
+          hsnCode: trimmedHsn || undefined,
+          gstRateBpOverride: gstBp ?? undefined,
           isVegetarian: isVeg,
         }),
       });
@@ -721,6 +836,8 @@ function AddItemForm({
       setName('');
       setPriceRupees('');
       setDescription('');
+      setHsnCode('');
+      setGstPercent('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add item');
     } finally {
@@ -766,6 +883,31 @@ function AddItemForm({
             maxLength={500}
           />
         </Field>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="HSN/SAC code" hint="Optional" htmlFor="item-hsn">
+            <Input
+              id="item-hsn"
+              inputMode="numeric"
+              placeholder="996331"
+              value={hsnCode}
+              onChange={(e) => setHsnCode(e.target.value)}
+              maxLength={8}
+            />
+          </Field>
+          <Field label="GST override (%)" hint="Blank = cafe default" htmlFor="item-gst">
+            <Input
+              id="item-gst"
+              type="number"
+              min="0"
+              max="28"
+              step="0.5"
+              placeholder="18"
+              value={gstPercent}
+              onChange={(e) => setGstPercent(e.target.value)}
+            />
+          </Field>
+        </div>
 
         <div className="flex items-center gap-2">
           <button

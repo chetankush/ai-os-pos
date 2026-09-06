@@ -1,12 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { cacheKey, getCache } from '../lib/cache.js';
+import { parseMenuCsv } from '../menu/import.js';
+import { type CafesRepository, createDrizzleCafesRepo } from '../repositories/cafes.js';
 import {
-  createDrizzleMenuRepo,
   type MenuRepository,
   type NewMenuItem,
+  createDrizzleMenuRepo,
 } from '../repositories/menu.js';
-import { createDrizzleCafesRepo, type CafesRepository } from '../repositories/cafes.js';
 
 export interface MenuRoutesOptions {
   repository?: MenuRepository;
@@ -32,6 +33,8 @@ const createItemBodySchema = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().max(500).optional(),
   basePricePaise: z.number().int().min(0).max(10_000_00),
+  hsnCode: z.string().trim().max(8).regex(/^\d+$/, 'HSN/SAC must be digits').optional(),
+  gstRateBpOverride: z.number().int().min(0).max(2800).optional(),
   imageUrl: z.string().trim().url().optional(),
   isVegetarian: z.boolean().optional(),
   isVegan: z.boolean().optional(),
@@ -40,11 +43,17 @@ const createItemBodySchema = z.object({
   sortOrder: z.number().int().min(0).optional(),
 });
 
+const importBodySchema = z.object({
+  csv: z.string().min(1).max(500_000),
+});
+
 const updateItemBodySchema = z
   .object({
     name: z.string().trim().min(1).max(120),
     description: z.string().trim().max(500).nullable(),
     basePricePaise: z.number().int().min(0).max(10_000_00),
+    hsnCode: z.string().trim().max(8).regex(/^\d+$/, 'HSN/SAC must be digits').nullable(),
+    gstRateBpOverride: z.number().int().min(0).max(2800).nullable(),
     imageUrl: z.string().trim().url().nullable(),
     isVegetarian: z.boolean(),
     isVegan: z.boolean(),
@@ -73,28 +82,24 @@ export async function menuRoutes(
     return cacheKey('menu', cafeId, 'full');
   }
 
-  app.get(
-    '/cafes/:cafeId/menu',
-    { preHandler: app.authenticate },
-    async (request, reply) => {
-      const { cafeId } = cafeParamsSchema.parse(request.params);
+  app.get('/cafes/:cafeId/menu', { preHandler: app.authenticate }, async (request, reply) => {
+    const { cafeId } = cafeParamsSchema.parse(request.params);
 
-      if (!(await assertCafeOwnedBy(cafeId, request.user.id))) {
-        return reply.status(404).send({
-          error: { code: 'NOT_FOUND', message: 'Cafe not found' },
-        });
-      }
+    if (!(await assertCafeOwnedBy(cafeId, request.user.id))) {
+      return reply.status(404).send({
+        error: { code: 'NOT_FOUND', message: 'Cafe not found' },
+      });
+    }
 
-      const key = menuCacheKey(cafeId);
-      const cached = await cache.get<{ categories: unknown[] }>(key);
-      if (cached) return cached;
+    const key = menuCacheKey(cafeId);
+    const cached = await cache.get<{ categories: unknown[] }>(key);
+    if (cached) return cached;
 
-      const categories = await menuRepo.getFullMenu(cafeId);
-      const payload = { categories };
-      await cache.set(key, payload, 60);
-      return payload;
-    },
-  );
+    const categories = await menuRepo.getFullMenu(cafeId);
+    const payload = { categories };
+    await cache.set(key, payload, 60);
+    return payload;
+  });
 
   app.post(
     '/cafes/:cafeId/menu/categories',
@@ -151,6 +156,8 @@ export async function menuRoutes(
         name: body.name,
         description: body.description ?? null,
         basePricePaise: body.basePricePaise,
+        hsnCode: body.hsnCode ?? null,
+        gstRateBpOverride: body.gstRateBpOverride ?? null,
         imageUrl: body.imageUrl ?? null,
         isVegetarian: body.isVegetarian ?? true,
         isVegan: body.isVegan ?? false,
@@ -162,6 +169,77 @@ export async function menuRoutes(
       const item = await menuRepo.createItem(newItem);
       await cache.del(menuCacheKey(cafeId));
       return reply.status(201).send({ item });
+    },
+  );
+
+  app.post(
+    '/cafes/:cafeId/menu/import',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { cafeId } = cafeParamsSchema.parse(request.params);
+
+      if (!(await assertCafeOwnedBy(cafeId, request.user.id))) {
+        return reply.status(404).send({
+          error: { code: 'NOT_FOUND', message: 'Cafe not found' },
+        });
+      }
+
+      const { csv } = importBodySchema.parse(request.body);
+      const { rows, errors } = parseMenuCsv(csv);
+
+      let categoriesCreated = 0;
+      let itemsCreated = 0;
+
+      // Map existing categories by lowercased name so we reuse instead of
+      // duplicating, and so two CSV rows in the same (new) category share one.
+      // Only hit the DB if there's actually something to import.
+      const categoryIdByName = new Map<string, string>();
+      if (rows.length > 0) {
+        for (const cat of await menuRepo.getFullMenu(cafeId)) {
+          categoryIdByName.set(cat.name.trim().toLowerCase(), cat.id);
+        }
+      }
+
+      for (const row of rows) {
+        const key = row.category.trim().toLowerCase();
+        let categoryId = categoryIdByName.get(key);
+        if (!categoryId) {
+          const created = await menuRepo.createCategory({
+            cafeId,
+            name: row.category,
+            sortOrder: 0,
+          });
+          categoryId = created.id;
+          categoryIdByName.set(key, categoryId);
+          categoriesCreated += 1;
+        }
+
+        await menuRepo.createItem({
+          cafeId,
+          categoryId,
+          name: row.name,
+          description: row.description,
+          basePricePaise: row.pricePaise,
+          hsnCode: null,
+          gstRateBpOverride: null,
+          imageUrl: null,
+          isVegetarian: row.isVegetarian,
+          isVegan: false,
+          containsEgg: false,
+          spiceLevel: row.spiceLevel,
+          sortOrder: 0,
+        });
+        itemsCreated += 1;
+      }
+
+      if (categoriesCreated > 0 || itemsCreated > 0) {
+        await cache.del(menuCacheKey(cafeId));
+      }
+
+      // "skipped" = rows that parsed-but-failed validation (each yields an
+      // error). Header-level errors (missing column / empty) carry no rows.
+      const skipped = errors.length;
+      return reply.status(200).send({ categoriesCreated, itemsCreated, skipped, errors });
     },
   );
 

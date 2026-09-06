@@ -1,3 +1,8 @@
+import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
+import { FadeIn } from '@/components/ui/motion';
+import { ApiError } from '@/lib/api';
+import { serverFetch } from '@/lib/api-server';
+import { cn } from '@/lib/cn';
 import type {
   CafeResponse,
   OrderItem,
@@ -7,14 +12,9 @@ import type {
   OrderStatus,
   PaymentMethod,
 } from '@sangam/types';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
-import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
-import { FadeIn } from '@/components/ui/motion';
-import { ApiError } from '@/lib/api';
-import { serverFetch } from '@/lib/api-server';
-import { cn } from '@/lib/cn';
 import { PaymentBadge } from '../_components/payment-badge';
 import { OrderActions } from './order-actions';
 import { PrintViews } from './print-views';
@@ -83,12 +83,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
       <FadeIn delay={0.05}>
         <div className="flex items-start justify-between gap-6">
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted">
-              Order
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight font-mono">
-              {order.orderNumber}
-            </h1>
+            <p className="text-xs uppercase tracking-[0.18em] text-muted">Order</p>
+            <h1 className="text-3xl font-semibold tracking-tight font-mono">{order.orderNumber}</h1>
             <p className="text-sm text-muted">
               {formatRelative(order.createdAt)} · {sourceLabel} · {customerLabel}
             </p>
@@ -96,10 +92,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
           <div className="flex flex-col items-end gap-3">
             <div className="flex flex-wrap items-center justify-end gap-2">
               <StatusPill status={order.status} />
-              <PaymentBadge
-                status={order.paymentStatus}
-                method={order.paymentMethod}
-              />
+              <PaymentBadge status={order.paymentStatus} method={order.paymentMethod} />
             </div>
             <PrintViews order={order} cafe={cafe} payments={payments} />
           </div>
@@ -115,9 +108,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
               </CardHeader>
               <CardBody className="pt-0">
                 {order.items.length === 0 ? (
-                  <p className="text-sm text-muted py-6 text-center">
-                    No items on this order.
-                  </p>
+                  <p className="text-sm text-muted py-6 text-center">No items on this order.</p>
                 ) : (
                   <ul className="divide-y divide-border">
                     {order.items.map((item) => (
@@ -137,9 +128,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
                 </CardHeader>
                 <CardBody className="pt-0">
                   <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
-                    {order.customerName && (
-                      <InfoRow label="Customer">{order.customerName}</InfoRow>
-                    )}
+                    {order.customerName && <InfoRow label="Customer">{order.customerName}</InfoRow>}
                     {order.customerPhone && (
                       <InfoRow label="Phone">
                         <a
@@ -150,9 +139,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
                         </a>
                       </InfoRow>
                     )}
-                    {order.tableLabel && (
-                      <InfoRow label="Table">{order.tableLabel}</InfoRow>
-                    )}
+                    {order.tableLabel && <InfoRow label="Table">{order.tableLabel}</InfoRow>}
                     {order.notes && (
                       <InfoRow label="Notes" full>
                         {order.notes}
@@ -178,7 +165,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   />
                 )}
                 {order.serviceChargePaise > 0 && (
-                  <SummaryRow label="Service charge" value={formatRupees(order.serviceChargePaise)} />
+                  <SummaryRow
+                    label="Service charge"
+                    value={formatRupees(order.serviceChargePaise)}
+                  />
                 )}
                 {order.packagingChargePaise > 0 && (
                   <SummaryRow label="Packaging" value={formatRupees(order.packagingChargePaise)} />
@@ -201,7 +191,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
                     {formatRupees(order.totalPaise)}
                   </span>
                 </div>
-                {order.paidAt && (
+                {/* Only surface the "Paid at" timestamp when payment is
+                    actually paid — otherwise the badge ("Unpaid") and this
+                    line contradict each other (audit finding). */}
+                {order.paidAt && order.paymentStatus === 'paid' && (
                   <p className="text-[11px] text-muted pt-1">
                     Paid at{' '}
                     {new Date(order.paidAt).toLocaleString('en-IN', {
@@ -257,14 +250,10 @@ function ItemRow({ item }: { item: OrderItem }) {
             × {item.quantity}
           </span>
         </div>
-        {item.notes && (
-          <p className="mt-1 text-xs text-muted">{item.notes}</p>
-        )}
+        {item.notes && <p className="mt-1 text-xs text-muted">{item.notes}</p>}
       </div>
       <div className="text-right shrink-0">
-        <div className="text-sm font-medium tabular-nums">
-          {formatRupees(item.lineTotalPaise)}
-        </div>
+        <div className="text-sm font-medium tabular-nums">{formatRupees(item.lineTotalPaise)}</div>
         <div className="text-[11px] text-muted tabular-nums">
           {formatRupees(item.unitPricePaise)} × {item.quantity}
         </div>
@@ -293,9 +282,7 @@ function InfoRow({
 }) {
   return (
     <div className={cn('space-y-1', full && 'sm:col-span-2')}>
-      <dt className="text-[11px] uppercase tracking-wider text-muted font-medium">
-        {label}
-      </dt>
+      <dt className="text-[11px] uppercase tracking-wider text-muted font-medium">{label}</dt>
       <dd className="text-sm leading-relaxed">{children}</dd>
     </div>
   );

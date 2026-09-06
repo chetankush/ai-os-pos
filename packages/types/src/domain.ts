@@ -57,6 +57,13 @@ export interface MenuItem {
   name: string;
   description: string | null;
   basePricePaise: number;
+  /** HSN/SAC code used for GST filing (GSTR-1). Null = not yet classified. */
+  hsnCode: string | null;
+  /**
+   * Per-item GST rate in basis points (e.g. 1800 = 18%). When set, overrides
+   * the cafe-level gstMode for this item. Null = use the cafe default.
+   */
+  gstRateBpOverride: number | null;
   imageUrl: string | null;
   isVegetarian: boolean;
   isVegan: boolean;
@@ -72,17 +79,34 @@ export interface MenuCategoryWithItems extends MenuCategory {
   items: MenuItem[];
 }
 
+// ─── Inventory / stock tracking ─────────────────────────────────────────────────
+
+/**
+ * A menu item with its stock state. `stockQty === null` means the item is
+ * untracked (no quantity limit); `lowStockThreshold === null` disables the
+ * low-stock warning. `isLow`/`isOut` are derived server-side for the UI.
+ */
+export interface InventoryItem {
+  menuItemId: MenuItemId;
+  categoryId: MenuCategoryId;
+  name: string;
+  isAvailable: boolean;
+  /** null = untracked (sells without limit). */
+  stockQty: number | null;
+  /** null = no low-stock warning configured. */
+  lowStockThreshold: number | null;
+  /** Tracked, threshold set, and stockQty <= threshold but > 0. */
+  isLow: boolean;
+  /** Tracked and stockQty <= 0. */
+  isOut: boolean;
+}
+
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
 export type OrderId = string;
 export type OrderItemId = string;
 
-export type OrderStatus =
-  | 'pending'
-  | 'preparing'
-  | 'ready'
-  | 'completed'
-  | 'cancelled';
+export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
 
 export type OrderSource = 'counter' | 'qr' | 'phone';
 

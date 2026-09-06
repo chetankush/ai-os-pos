@@ -1,16 +1,20 @@
 'use client';
 
+import { cn } from '@/lib/cn';
 import {
-  BarChart3,
+  Boxes,
+  ChefHat,
+  Contact,
   LayoutDashboard,
   LineChart,
   Menu as MenuIcon,
-  MessageSquareText,
   Pencil,
   QrCode,
   ReceiptText,
   ScrollText,
   ShoppingBag,
+  Sparkles,
+  TrendingDown,
   Users,
   UtensilsCrossed,
   Wallet,
@@ -19,7 +23,6 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { cn } from '@/lib/cn';
 
 interface NavItem {
   label: string;
@@ -50,14 +53,17 @@ export function CafeShell({
     { label: 'Dashboard', href: base, icon: <LayoutDashboard className="size-4" />, exact: true },
     { label: 'New order', href: `${base}/orders/new`, icon: <ShoppingBag className="size-4" /> },
     { label: 'Orders', href: `${base}/orders`, icon: <ReceiptText className="size-4" /> },
+    { label: 'Kitchen', href: `${base}/kitchen`, icon: <ChefHat className="size-4" /> },
     { label: 'Menu', href: `${base}/menu`, icon: <UtensilsCrossed className="size-4" /> },
+    { label: 'Inventory', href: `${base}/inventory`, icon: <Boxes className="size-4" /> },
     { label: 'Tables & QR', href: `${base}/tables`, icon: <QrCode className="size-4" /> },
     { label: 'Reports', href: `${base}/reports`, icon: <LineChart className="size-4" /> },
+    { label: 'Expenses', href: `${base}/expenses`, icon: <TrendingDown className="size-4" /> },
     { label: 'Cash drawer', href: `${base}/cash-drawer`, icon: <Wallet className="size-4" /> },
+    { label: 'Customers', href: `${base}/customers`, icon: <Contact className="size-4" /> },
     { label: 'Staff', href: `${base}/staff`, icon: <Users className="size-4" /> },
     { label: 'Audit log', href: `${base}/audit`, icon: <ScrollText className="size-4" /> },
-    { label: 'AI Manager', href: `${base}/manager`, icon: <BarChart3 className="size-4" /> },
-    { label: 'AI Waiter', href: `${base}/ai-waiter`, icon: <MessageSquareText className="size-4" /> },
+    { label: 'AI Manager', href: `${base}/manager`, icon: <Sparkles className="size-4" /> },
   ];
 
   // Longest matching href wins, so /orders/new highlights "New order", not "Orders".
@@ -80,7 +86,11 @@ export function CafeShell({
               'flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors touch-manipulation',
               active
                 ? 'bg-accent/10 text-accent'
-                : 'text-muted hover:bg-subtle hover:text-fg',
+                : // Only text changes on hover — keeping the background
+                  // unchanged means the active (coral-tinted) item is the
+                  // only one with a background, so a hovered + active nav
+                  // can never visually compete.
+                  'text-muted hover:text-fg',
             )}
           >
             {it.icon}
@@ -102,9 +112,7 @@ export function CafeShell({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{cafeName}</span>
-        <span className="block truncate text-xs text-muted">
-          {userEmail || 'Edit profile'}
-        </span>
+        <span className="block truncate text-xs text-muted">{userEmail || 'Edit profile'}</span>
       </span>
       <Pencil className="size-3.5 shrink-0 text-muted group-hover:text-fg" />
     </Link>

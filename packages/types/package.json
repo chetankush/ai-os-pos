@@ -3,21 +3,26 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./api": {
-      "types": "./src/api.ts",
-      "default": "./src/api.ts"
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
     },
     "./domain": {
-      "types": "./src/domain.ts",
-      "default": "./src/domain.ts"
+      "types": "./dist/domain.d.ts",
+      "default": "./dist/domain.js"
     }
   },
+  "files": ["dist"],
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

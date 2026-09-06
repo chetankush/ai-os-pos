@@ -1,5 +1,17 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Field } from '@/components/ui/label';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { cn } from '@/lib/cn';
+import {
+  type DinerOrderRecord,
+  addDinerOrder,
+  getDinerOrders,
+  updateDinerOrder,
+} from '@/lib/diner-orders';
+import { loadRazorpay } from '@/lib/razorpay';
 import type {
   CreatePaymentResponse,
   MenuCategoryWithItems,
@@ -23,18 +35,6 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Field } from '@/components/ui/label';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
-import { cn } from '@/lib/cn';
-import {
-  addDinerOrder,
-  type DinerOrderRecord,
-  getDinerOrders,
-  updateDinerOrder,
-} from '@/lib/diner-orders';
-import { loadRazorpay } from '@/lib/razorpay';
 import { AiWidget } from './ai-widget';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -89,10 +89,7 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
     return map;
   }, [categories]);
 
-  const liveCategories = useMemo(
-    () => categories.filter((c) => c.items.length > 0),
-    [categories],
-  );
+  const liveCategories = useMemo(() => categories.filter((c) => c.items.length > 0), [categories]);
 
   // Menu navigation: one active category at a time (left rail), plus a search
   // that spans all items. Matches the scan-friendly DropTheQ/Swiggy layout.
@@ -151,10 +148,7 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
     [cart, itemsById],
   );
 
-  const itemCount = useMemo(
-    () => cartLines.reduce((s, l) => s + l.quantity, 0),
-    [cartLines],
-  );
+  const itemCount = useMemo(() => cartLines.reduce((s, l) => s + l.quantity, 0), [cartLines]);
   const subtotalPaise = useMemo(
     () => cartLines.reduce((s, l) => s + l.item.basePricePaise * l.quantity, 0),
     [cartLines],
@@ -182,9 +176,7 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
       setPaying(true);
       try {
         const createRes = await fetch(
-          `${API_URL}/public/cafes/${encodeURIComponent(slug)}/orders/${
-            order.id
-          }/payment`,
+          `${API_URL}/public/cafes/${encodeURIComponent(slug)}/orders/${order.id}/payment`,
           {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -196,9 +188,7 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
         );
         if (!createRes.ok) {
           const err = await createRes.json().catch(() => null);
-          throw new Error(
-            err?.error?.message ?? `Could not start payment (${createRes.status})`,
-          );
+          throw new Error(err?.error?.message ?? `Could not start payment (${createRes.status})`);
         }
         const payment = (await createRes.json()) as CreatePaymentResponse;
 
@@ -233,8 +223,7 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
             if (!verifyRes.ok) {
               const err = await verifyRes.json().catch(() => null);
               throw new Error(
-                err?.error?.message ??
-                  `We couldn't confirm your payment (${verifyRes.status})`,
+                err?.error?.message ?? `We couldn't confirm your payment (${verifyRes.status})`,
               );
             }
             const data = (await verifyRes.json()) as VerifyPaymentResponse;
@@ -242,9 +231,7 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
             setConfirmKind('paid');
             setHistory(updateDinerOrder(slug, data.order.id, { paymentStatus: 'paid' }));
           } catch (err) {
-            toast.error(
-              err instanceof Error ? err.message : 'Payment could not be confirmed.',
-            );
+            toast.error(err instanceof Error ? err.message : 'Payment could not be confirmed.');
             // Keep the order; offer Retry from the pending screen.
             setConfirmKind('pending');
           } finally {
@@ -281,9 +268,7 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
         // top-level spinner so the screen behind Checkout isn't stuck disabled.
         setPaying(false);
       } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : 'Could not start payment.',
-        );
+        toast.error(err instanceof Error ? err.message : 'Could not start payment.');
         setConfirmKind('pending');
         setPaying(false);
       }
@@ -321,19 +306,14 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
 
     setSubmitting(true);
     try {
-      const res = await fetch(
-        `${API_URL}/public/cafes/${encodeURIComponent(slug)}/orders`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(body),
-        },
-      );
+      const res = await fetch(`${API_URL}/public/cafes/${encodeURIComponent(slug)}/orders`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(
-          err?.error?.message ?? `Could not place order (${res.status})`,
-        );
+        throw new Error(err?.error?.message ?? `Could not place order (${res.status})`);
       }
       const data = (await res.json()) as PublicOrderResponse;
       const order = data.order;
@@ -408,12 +388,8 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-semibold tracking-tight">
-              {cafe.name}
-            </h1>
-            {cafe.city && (
-              <p className="truncate text-xs text-muted">{cafe.city}</p>
-            )}
+            <h1 className="truncate text-base font-semibold tracking-tight">{cafe.name}</h1>
+            {cafe.city && <p className="truncate text-xs text-muted">{cafe.city}</p>}
           </div>
           {table && (
             <span className="shrink-0 rounded-full border border-border bg-subtle px-3 py-1 text-xs font-medium">
@@ -426,9 +402,16 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
 
       {/* ─── Menu (category rail + search + card grid) ────────────────────── */}
       {liveCategories.length === 0 ? (
-        <p className="py-16 text-center text-sm text-muted">
-          No items are available right now.
-        </p>
+        <div className="mx-auto max-w-md px-6 py-16 text-center">
+          <div className="mx-auto grid size-12 place-items-center rounded-full border border-border bg-subtle">
+            <UtensilsCrossed className="size-5 text-muted" aria-hidden="true" />
+          </div>
+          <p className="mt-4 text-base font-medium">Menu coming soon</p>
+          <p className="mt-1 text-sm text-muted">
+            {cafe.name} is still setting up. Please flag down a server, or check back in a few
+            minutes.
+          </p>
+        </div>
       ) : (
         <div className="mx-auto flex max-w-3xl">
           <CategoryRail
@@ -467,15 +450,11 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
             </div>
 
             <h2 className="mb-3 text-sm font-semibold tracking-tight">
-              {trimmedQuery
-                ? `Results for “${query.trim()}”`
-                : (activeCategory?.name ?? 'Menu')}
+              {trimmedQuery ? `Results for “${query.trim()}”` : (activeCategory?.name ?? 'Menu')}
             </h2>
 
             {visibleItems.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted">
-                No items match your search.
-              </p>
+              <p className="py-12 text-center text-sm text-muted">No items match your search.</p>
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 {visibleItems.map((item) => (
@@ -538,9 +517,7 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
           />
           <div className="relative mx-auto flex max-h-[90dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border-t border-border bg-bg">
             <div className="flex items-center justify-between border-b border-border p-4">
-              <h2 className="text-base font-semibold tracking-tight">
-                Your order ({itemCount})
-              </h2>
+              <h2 className="text-base font-semibold tracking-tight">Your order ({itemCount})</h2>
               <button
                 type="button"
                 onClick={() => setCartOpen(false)}
@@ -562,16 +539,11 @@ export function DinerOrder({ slug, table, cafe, categories }: Props) {
               )}
 
               {cartLines.length === 0 ? (
-                <p className="py-10 text-center text-sm text-muted">
-                  Your order is empty.
-                </p>
+                <p className="py-10 text-center text-sm text-muted">Your order is empty.</p>
               ) : (
                 <ul className="divide-y divide-border">
                   {cartLines.map((line) => (
-                    <li
-                      key={line.item.id}
-                      className="flex items-center gap-3 py-3"
-                    >
+                    <li key={line.item.id} className="flex items-center gap-3 py-3">
                       <div className="min-w-0 flex-1">
                         <p className="flex items-center gap-1.5 truncate text-sm font-medium">
                           <DietMark item={line.item} />
@@ -695,9 +667,7 @@ function CategoryRail({
                 aria-current={active ? 'true' : undefined}
                 className={cn(
                   'flex w-full flex-col items-center gap-1 rounded-lg px-1 py-2 text-center transition-colors touch-manipulation',
-                  active
-                    ? 'bg-accent/10 text-accent'
-                    : 'text-muted hover:bg-subtle hover:text-fg',
+                  active ? 'bg-accent/10 text-accent' : 'text-muted hover:bg-subtle hover:text-fg',
                 )}
               >
                 <span
@@ -770,13 +740,9 @@ function ItemCard({
       </div>
 
       <div className="flex flex-1 flex-col p-2.5">
-        <p className="line-clamp-2 text-sm font-medium leading-tight">
-          {item.name}
-        </p>
+        <p className="line-clamp-2 text-sm font-medium leading-tight">{item.name}</p>
         {item.description && (
-          <p className="mt-0.5 line-clamp-1 text-xs text-muted">
-            {item.description}
-          </p>
+          <p className="mt-0.5 line-clamp-1 text-xs text-muted">{item.description}</p>
         )}
         <p className="mt-1.5 text-sm font-semibold tabular-nums">
           {formatRupees(item.basePricePaise)}
@@ -848,9 +814,7 @@ function Stepper({
       >
         <Minus className="size-4" />
       </button>
-      <span className="min-w-7 text-center text-sm font-semibold tabular-nums">
-        {qty}
-      </span>
+      <span className="min-w-7 text-center text-sm font-semibold tabular-nums">{qty}</span>
       <button
         type="button"
         onClick={onAdd}
@@ -884,13 +848,7 @@ export function DietMark({ item }: { item: MenuItem }) {
         veg ? 'border-success' : 'border-danger',
       )}
     >
-      <span
-        aria-hidden
-        className={cn(
-          'size-1.5 rounded-full',
-          veg ? 'bg-success' : 'bg-danger',
-        )}
-      />
+      <span aria-hidden className={cn('size-1.5 rounded-full', veg ? 'bg-success' : 'bg-danger')} />
     </span>
   );
 }
@@ -947,18 +905,9 @@ function Confirmation({
   return (
     <main className="grid min-h-dvh place-items-center bg-bg px-6">
       <div className="w-full max-w-sm space-y-5 text-center">
-        <div
-          className={cn(
-            'mx-auto grid size-16 place-items-center rounded-2xl',
-            iconWrap,
-          )}
-        >
+        <div className={cn('mx-auto grid size-16 place-items-center rounded-2xl', iconWrap)}>
           {/* spin only on the pending state; reduced-motion handled in globals */}
-          {kind === 'pending' ? (
-            <span className="motion-safe:animate-spin">{icon}</span>
-          ) : (
-            icon
-          )}
+          {kind === 'pending' ? <span className="motion-safe:animate-spin">{icon}</span> : icon}
         </div>
 
         <div className="space-y-1.5">
@@ -984,13 +933,7 @@ function Confirmation({
         {/* ─── Actions per state ───────────────────────────────────────── */}
         {kind === 'choose' && (
           <div className="space-y-2.5">
-            <Button
-              type="button"
-              size="lg"
-              className="w-full"
-              loading={paying}
-              onClick={onPay}
-            >
+            <Button type="button" size="lg" className="w-full" loading={paying} onClick={onPay}>
               {paying ? 'Opening payment' : `Pay ${formatRupees(order.totalPaise)} now`}
             </Button>
             <Button
@@ -1008,16 +951,8 @@ function Confirmation({
 
         {kind === 'pending' && (
           <div className="space-y-2.5">
-            <Button
-              type="button"
-              size="lg"
-              className="w-full"
-              loading={paying}
-              onClick={onPay}
-            >
-              {paying
-                ? 'Opening payment'
-                : `Pay ${formatRupees(order.totalPaise)}`}
+            <Button type="button" size="lg" className="w-full" loading={paying} onClick={onPay}>
+              {paying ? 'Opening payment' : `Pay ${formatRupees(order.totalPaise)}`}
             </Button>
             <p className="text-[11px] text-muted">
               Having trouble? Ask a staff member to help you pay.
@@ -1026,12 +961,7 @@ function Confirmation({
         )}
 
         {(kind === 'paid' || kind === 'counter') && (
-          <Button
-            type="button"
-            variant="secondary"
-            className="w-full"
-            onClick={onAnother}
-          >
+          <Button type="button" variant="secondary" className="w-full" onClick={onAnother}>
             Order more
           </Button>
         )}

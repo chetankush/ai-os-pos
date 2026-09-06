@@ -1,22 +1,17 @@
 'use client';
 
+import { Button, buttonClasses } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 import type {
   OrderWithItems,
   PaymentMethod,
   TableSessionDetail,
   TableSessionDetailResponse,
 } from '@sangam/types';
-import {
-  Banknote,
-  CreditCard,
-  Plus,
-  Smartphone,
-} from 'lucide-react';
+import { Banknote, CreditCard, Plus, Printer, Smartphone } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Button, buttonClasses } from '@/components/ui/button';
-import { cn } from '@/lib/cn';
 import { Sheet } from './sheet';
 import { authedFetch, formatRupees } from './tables-tool';
 
@@ -35,13 +30,7 @@ const PAYMENT_METHODS: Array<{ value: PaymentMethod; label: string; Icon: typeof
   { value: 'card', label: 'Card', Icon: CreditCard },
 ];
 
-export function TableSessionSheet({
-  cafeId,
-  sessionId,
-  tableLabel,
-  onClose,
-  onChanged,
-}: Props) {
+export function TableSessionSheet({ cafeId, sessionId, tableLabel, onClose, onChanged }: Props) {
   const [detail, setDetail] = useState<TableSessionDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [method, setMethod] = useState<PaymentMethod>('upi');
@@ -104,7 +93,10 @@ export function TableSessionSheet({
       title={`Table ${tableLabel}`}
       subtitle={
         detail
-          ? [guest || 'Guest', detail.session.partySize ? `Party of ${detail.session.partySize}` : null]
+          ? [
+              guest || 'Guest',
+              detail.session.partySize ? `Party of ${detail.session.partySize}` : null,
+            ]
               .filter(Boolean)
               .join(' · ')
           : 'Running tab'
@@ -173,14 +165,34 @@ export function TableSessionSheet({
         </div>
       ) : (
         <div className="space-y-5">
-          {/* Add items CTA */}
-          <Link
-            href={`/cafes/${cafeId}/orders/new?session=${sessionId}`}
-            className={buttonClasses({ variant: 'secondary', size: 'md', className: 'w-full' })}
-          >
-            <Plus className="size-4" />
-            Add items
-          </Link>
+          {/* Add items + Print bill — Print is disabled until the tab has
+              at least one round (nothing to print otherwise). */}
+          <div className="flex gap-2">
+            <Link
+              href={`/cafes/${cafeId}/orders/new?session=${sessionId}`}
+              className={buttonClasses({ variant: 'secondary', size: 'md', className: 'flex-1' })}
+            >
+              <Plus className="size-4" />
+              Add items
+            </Link>
+            <a
+              href={`/cafes/${cafeId}/tables/sessions/${sessionId}/print`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-disabled={detail.orders.length === 0}
+              className={buttonClasses({
+                variant: 'secondary',
+                size: 'md',
+                className: cn(
+                  'flex-1',
+                  detail.orders.length === 0 && 'pointer-events-none opacity-50',
+                ),
+              })}
+            >
+              <Printer className="size-4" />
+              Print bill
+            </a>
+          </div>
 
           {/* Running tab — one block per order */}
           {detail.orders.length === 0 ? (
@@ -218,12 +230,8 @@ function OrderBlock({ order }: { order: OrderWithItems }) {
   return (
     <div className="rounded-lg border border-border bg-subtle/30 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="font-mono text-xs font-medium text-muted">
-          {order.orderNumber}
-        </span>
-        <span className="text-xs font-medium tabular-nums">
-          {formatRupees(order.totalPaise)}
-        </span>
+        <span className="font-mono text-xs font-medium text-muted">{order.orderNumber}</span>
+        <span className="text-xs font-medium tabular-nums">{formatRupees(order.totalPaise)}</span>
       </div>
       <ul className="space-y-1">
         {order.items.map((item) => (
@@ -254,9 +262,7 @@ function TotalRow({
   return (
     <div className="flex items-baseline justify-between text-xs">
       <span className={muted ? 'text-muted' : 'text-fg'}>{label}</span>
-      <span
-        className={cn('tabular-nums', muted ? 'text-muted' : 'font-medium text-fg')}
-      >
+      <span className={cn('tabular-nums', muted ? 'text-muted' : 'font-medium text-fg')}>
         {formatRupees(paise)}
       </span>
     </div>

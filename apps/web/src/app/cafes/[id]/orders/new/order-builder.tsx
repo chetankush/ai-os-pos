@@ -1,5 +1,13 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Field } from '@/components/ui/label';
+import { cn } from '@/lib/cn';
+import { type OrderSender, enqueue } from '@/lib/offline-queue';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { useOfflineQueue } from '@/lib/use-offline-queue';
 import type {
   Cafe,
   CreateOrderRequest,
@@ -8,16 +16,21 @@ import type {
   OrderResponse,
 } from '@sangam/types';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Armchair, Minus, Plus, Search, ShoppingBag, Trash2, X } from 'lucide-react';
+import {
+  Armchair,
+  CloudOff,
+  Minus,
+  Plus,
+  Printer,
+  Search,
+  ShoppingBag,
+  Trash2,
+  WifiOff,
+  X,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/cn';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 interface Props {
   cafeId: string;
@@ -39,6 +52,19 @@ const PHONE_RE = /^\+?\d{7,15}$/;
 const MAX_QTY = 99;
 const ALL = '__all__';
 
+// Per-device, per-cafe auto-print-KOT preference. Default ON for new cafes.
+const AUTOPRINT_KEY = (cafeId: string) => `sangam:kot-autoprint:${cafeId}`;
+
+/**
+ * Thrown when a request fails for a reason worth retrying offline — the fetch
+ * itself rejected (no network) or the server returned a 5xx. 4xx (validation,
+ * auth) are NOT network errors: those are surfaced to the cashier as-is so they
+ * fix the input rather than silently queueing a bad order.
+ */
+class NetworkError extends Error {
+  readonly isNetworkError = true;
+}
+
 async function authedFetch(path: string, init: RequestInit = {}) {
   const supabase = createSupabaseBrowserClient();
   const {
@@ -48,13 +74,26 @@ async function authedFetch(path: string, init: RequestInit = {}) {
   if (init.body) headers.set('content-type', 'application/json');
   if (session) headers.set('authorization', `Bearer ${session.access_token}`);
 
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...init, headers });
+  } catch {
+    // fetch rejects on DNS/connection failure — i.e. we're offline.
+    throw new NetworkError('Network request failed');
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new Error(body?.error?.message ?? `Request failed (${res.status})`);
+    const message = body?.error?.message ?? `Request failed (${res.status})`;
+    // Treat server errors as retryable; client errors are the cashier's to fix.
+    if (res.status >= 500) throw new NetworkError(message);
+    throw new Error(message);
   }
   if (res.status === 204) return null;
   return res.json();
+}
+
+function isNetworkError(err: unknown): boolean {
+  return err instanceof NetworkError;
 }
 
 function formatRupees(paise: number): string {
@@ -96,7 +135,9 @@ function computeBill(
     discountPaise = Math.min(discountPaise, subtotalPaise);
   }
   const netFood = subtotalPaise - discountPaise;
-  const serviceChargePaise = opts.serviceChargeBp ? nn((netFood * opts.serviceChargeBp) / 10000) : 0;
+  const serviceChargePaise = opts.serviceChargeBp
+    ? nn((netFood * opts.serviceChargeBp) / 10000)
+    : 0;
   const packagingChargePaise = nn(opts.packagingChargePaise ?? 0);
   const taxableBase = netFood + serviceChargePaise + packagingChargePaise;
   const taxPaise = Math.round((taxableBase * gstRateBp) / 10000);
@@ -112,13 +153,7 @@ function computeBill(
   };
 }
 
-export function OrderBuilder({
-  cafeId,
-  cafe,
-  categories,
-  sessionId,
-  sessionTableLabel,
-}: Props) {
+export function OrderBuilder({ cafeId, cafe, categories, sessionId, sessionTableLabel }: Props) {
   const router = useRouter();
   const inSession = Boolean(sessionId);
   const [cart, setCart] = useState<Map<string, CartLine>>(new Map());
@@ -138,6 +173,47 @@ export function OrderBuilder({
   const [packagingRupees, setPackagingRupees] = useState('');
   const [roundOff, setRoundOff] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+
+  // ─── Offline resilience ────────────────────────────────────────────────────
+  // Sender used by the queue to replay orders once connectivity is back. Per-
+  // order success/failure is toasted so the cashier sees what synced.
+  const sender = useCallback<OrderSender>(
+    async (item) => {
+      const data = (await authedFetch(`/cafes/${cafeId}/orders`, {
+        method: 'POST',
+        body: JSON.stringify(item.payload),
+      })) as OrderResponse;
+      toast.success(`Synced order ${data.order.orderNumber}`);
+      router.refresh();
+    },
+    [cafeId, router],
+  );
+  const { online, pendingCount } = useOfflineQueue(cafeId, sender);
+
+  // Auto-print KOT (per-device preference). Hydrated from localStorage after
+  // mount to keep SSR/CSR markup identical; defaults to ON for new cafes.
+  const [autoPrintKot, setAutoPrintKot] = useState(true);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(AUTOPRINT_KEY(cafeId));
+      if (raw === 'false') setAutoPrintKot(false);
+      else if (raw === 'true') setAutoPrintKot(true);
+    } catch {
+      // localStorage unavailable (private mode etc.); keep default.
+    }
+  }, [cafeId]);
+  function toggleAutoPrintKot() {
+    setAutoPrintKot((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(AUTOPRINT_KEY(cafeId), String(next));
+      } catch {
+        // Ignore — preference simply won't persist on this device.
+      }
+      return next;
+    });
+  }
 
   // ─── Cart mutations ──────────────────────────────────────────────────────────
 
@@ -178,18 +254,14 @@ export function OrderBuilder({
   // ─── Derived ─────────────────────────────────────────────────────────────────
 
   const cartLines = useMemo(() => Array.from(cart.values()), [cart]);
-  const itemCount = useMemo(
-    () => cartLines.reduce((s, l) => s + l.quantity, 0),
-    [cartLines],
-  );
+  const itemCount = useMemo(() => cartLines.reduce((s, l) => s + l.quantity, 0), [cartLines]);
   const subtotalPaise = useMemo(
     () => cartLines.reduce((s, l) => s + l.menuItem.basePricePaise * l.quantity, 0),
     [cartLines],
   );
   // GST rate is driven by the cafe's declared mode (Sept-2025 reform), not AC.
   // Composition dealers and exempt cafes charge no GST on the bill.
-  const gstRateBp =
-    cafe.gstMode === 'regular_18' ? 1800 : cafe.gstMode === 'regular_5' ? 500 : 0;
+  const gstRateBp = cafe.gstMode === 'regular_18' ? 1800 : cafe.gstMode === 'regular_5' ? 500 : 0;
 
   // Bill adjustments → resolved paise (previews exactly what the server charges).
   const discountInput = Number(discountValue) || 0;
@@ -289,6 +361,24 @@ export function OrderBuilder({
         body: JSON.stringify(body),
       })) as OrderResponse;
       toast.success(`Order ${data.order.orderNumber} placed`);
+
+      // Fire the kitchen ticket immediately if the cashier opted in. Open the
+      // order detail in a new tab with ?autoprint=kot — the print-views
+      // component picks that up, prints, then self-closes. Done BEFORE the
+      // router.push so the user-gesture allowance still covers window.open
+      // (popup-blocker friendly).
+      if (autoPrintKot && typeof window !== 'undefined') {
+        try {
+          window.open(
+            `/cafes/${cafeId}/orders/${data.order.id}?autoprint=kot`,
+            '_blank',
+            'noopener,noreferrer',
+          );
+        } catch {
+          // Popup blocked — order still placed; cashier can hit "Print KOT".
+        }
+      }
+
       // Adding to a table tab → return to the live floor; otherwise show the order.
       if (inSession) {
         router.push(`/cafes/${cafeId}/tables`);
@@ -297,9 +387,36 @@ export function OrderBuilder({
       }
       router.refresh();
     } catch (err) {
+      // Network/offline failure → save the order locally so the counter keeps
+      // moving; it will replay automatically when connectivity returns.
+      if (isNetworkError(err)) {
+        enqueue(cafeId, body);
+        toast.success("Saved offline — will sync when you're back online");
+        resetForm();
+        if (inSession) router.push(`/cafes/${cafeId}/tables`);
+        setSubmitting(false);
+        return;
+      }
+      // Validation / auth error — surface it so the cashier fixes the input.
       setError(err instanceof Error ? err.message : 'Failed to create order');
       setSubmitting(false);
     }
+  }
+
+  function resetForm() {
+    setCart(new Map());
+    setTableLabel('');
+    setCustomerName('');
+    setCustomerPhone('');
+    setNotes('');
+    setDiscountType('percent');
+    setDiscountValue('');
+    setDiscountReason('');
+    setServiceChargePct('');
+    setPackagingRupees('');
+    setRoundOff(false);
+    setMobileCartOpen(false);
+    setError(null);
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────────
@@ -346,24 +463,50 @@ export function OrderBuilder({
     onSubmit: handleSubmit,
   };
 
+  const showOfflineBadge = !online || pendingCount > 0;
+
   return (
     <>
+      {showOfflineBadge && <OfflineBadge online={online} pendingCount={pendingCount} />}
+
       {inSession && (
         <div className="mb-4 flex items-center gap-2.5 rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 text-sm">
           <Armchair className="size-4 shrink-0 text-accent" aria-hidden="true" />
           <span className="text-fg">
-            Adding to{' '}
-            <span className="font-semibold">
-              Table {sessionTableLabel ?? '—'}
-            </span>{' '}
-            tab
+            Adding to <span className="font-semibold">Table {sessionTableLabel ?? '—'}</span> tab
           </span>
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-5">
+      {/* Auto-print KOT toggle — small, unobtrusive, sits above the grid.
+          On = a kitchen ticket auto-prints to a new tab when the order is
+          placed; off = cashier must hit Print KOT on the order page. */}
+      <div className="mb-3 flex items-center justify-end">
+        <button
+          type="button"
+          onClick={toggleAutoPrintKot}
+          aria-pressed={autoPrintKot}
+          title={
+            autoPrintKot
+              ? 'A kitchen ticket prints automatically when you place an order'
+              : 'Click to auto-print a kitchen ticket on every new order'
+          }
+          className={cn(
+            'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
+            autoPrintKot
+              ? 'border-accent/40 bg-accent/10 text-accent'
+              : 'border-border text-muted hover:border-border-strong hover:text-fg',
+          )}
+        >
+          <Printer className="size-3.5" aria-hidden="true" />
+          Auto-print KOT: {autoPrintKot ? 'On' : 'Off'}
+        </button>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-5">
         {/* ─── Fast item pad ─────────────────────────────────────────────── */}
-        <div className="lg:col-span-3 space-y-3">
+        <div className="md:col-span-3 space-y-3">
           {/* Search */}
           <div className="relative">
             <Search className="size-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -384,11 +527,7 @@ export function OrderBuilder({
                 All
               </Chip>
               {liveCategories.map((c) => (
-                <Chip
-                  key={c.id}
-                  active={activeCat === c.id}
-                  onClick={() => setActiveCat(c.id)}
-                >
+                <Chip key={c.id} active={activeCat === c.id} onClick={() => setActiveCat(c.id)}>
                   {c.name}
                 </Chip>
               ))}
@@ -435,9 +574,10 @@ export function OrderBuilder({
           )}
         </div>
 
-        {/* ─── Cart (desktop, sticky) ────────────────────────────────────── */}
-        <div className="lg:col-span-2 hidden lg:block">
-          <div className="lg:sticky lg:top-20">
+        {/* ─── Cart (tablet+, sticky) — tablet (iPad) is a real cafe device,
+            so the inline cart shows at md+ instead of waiting for lg+. ── */}
+        <div className="md:col-span-2 hidden md:block">
+          <div className="md:sticky md:top-20">
             <CartPanel {...cartProps} />
           </div>
         </div>
@@ -449,7 +589,7 @@ export function OrderBuilder({
           type="button"
           onClick={() => setMobileCartOpen(true)}
           className={cn(
-            'lg:hidden fixed bottom-4 inset-x-4 z-40 h-14 rounded-full',
+            'md:hidden fixed bottom-4 inset-x-4 z-40 h-14 rounded-full',
             'flex items-center justify-between px-5',
             'bg-accent text-accent-fg shadow-lg shadow-black/15',
             'active:scale-[0.99] transition-transform',
@@ -469,7 +609,7 @@ export function OrderBuilder({
       <AnimatePresence>
         {mobileCartOpen && (
           <motion.div
-            className="lg:hidden fixed inset-0 z-50 flex items-end"
+            className="md:hidden fixed inset-0 z-50 flex items-end"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -488,9 +628,7 @@ export function OrderBuilder({
               transition={{ type: 'tween', duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-bg p-4">
-                <h2 className="text-base font-semibold tracking-tight">
-                  Cart ({itemCount})
-                </h2>
+                <h2 className="text-base font-semibold tracking-tight">Cart ({itemCount})</h2>
                 <button
                   type="button"
                   onClick={() => setMobileCartOpen(false)}
@@ -508,6 +646,33 @@ export function OrderBuilder({
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+// ─── Offline / unsynced indicator ───────────────────────────────────────────────
+
+function OfflineBadge({ online, pendingCount }: { online: boolean; pendingCount: number }) {
+  // Offline → amber warning (transient, expected). Back online but still holding
+  // unsynced orders → keep it visible so the cashier knows sync is in flight.
+  const Icon = online ? CloudOff : WifiOff;
+  const label = online
+    ? `${pendingCount} unsynced`
+    : pendingCount > 0
+      ? `Offline · ${pendingCount} unsynced`
+      : 'Offline';
+
+  return (
+    <div
+      role="status"
+      className={cn(
+        // Sits above the mobile floating cart pill so the two never overlap.
+        'fixed bottom-24 right-4 z-50 inline-flex items-center gap-2 rounded-full lg:bottom-4',
+        'border border-danger/40 bg-danger/10 px-3 py-1.5 text-xs font-medium text-danger shadow-sm backdrop-blur',
+      )}
+    >
+      <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+      <span className="tabular-nums">{label}</span>
+    </div>
   );
 }
 
@@ -585,13 +750,9 @@ function ItemTile({
               )}
             />
           </span>
-          <span className="line-clamp-2 text-sm font-medium leading-tight">
-            {item.name}
-          </span>
+          <span className="line-clamp-2 text-sm font-medium leading-tight">{item.name}</span>
         </div>
-        <span className="font-mono text-sm tabular-nums">
-          {formatRupees(item.basePricePaise)}
-        </span>
+        <span className="font-mono text-sm tabular-nums">{formatRupees(item.basePricePaise)}</span>
       </button>
 
       {/* Explicit add / quantity control so it's obvious how to add an item */}
@@ -720,9 +881,7 @@ function CartPanel(props: CartPanelProps) {
       )}
 
       {cartLines.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted">
-          Tap items to build the order
-        </p>
+        <p className="py-8 text-center text-sm text-muted">Tap items to build the order</p>
       ) : (
         <ul className="divide-y divide-border">
           <AnimatePresence initial={false}>
@@ -806,9 +965,7 @@ function CartPanel(props: CartPanelProps) {
         )}
         <div className="flex items-baseline justify-between border-t border-border pt-2">
           <span className="text-sm font-semibold">Total</span>
-          <span className="text-lg font-semibold tabular-nums">
-            {formatRupees(totalPaise)}
-          </span>
+          <span className="text-lg font-semibold tabular-nums">{formatRupees(totalPaise)}</span>
         </div>
       </div>
 

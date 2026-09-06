@@ -1,9 +1,9 @@
 import type { Cafe, Order, OrderItem, OrderWithItems } from '@sangam/types';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { buildTestApp } from '../../test/helpers.js';
 import type { CafesRepository } from '../repositories/cafes.js';
 import type { OrdersRepository } from '../repositories/orders.js';
-import { buildTestApp } from '../../test/helpers.js';
 import { publicRoutes } from './public.js';
 
 const CAFE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -100,6 +100,7 @@ function createMockOrdersRepo() {
     create: vi.fn(),
     listByCafe: vi.fn(),
     listBySession: vi.fn(),
+    listKitchenTickets: vi.fn(),
     findByIdAndCafe: vi.fn(),
     updateStatus: vi.fn(),
     todayStats: vi.fn(),

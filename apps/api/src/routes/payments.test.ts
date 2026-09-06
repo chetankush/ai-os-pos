@@ -1,10 +1,10 @@
 import type { Cafe, Order, OrderWithItems } from '@sangam/types';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildTestApp } from '../../test/helpers.js';
 import type { PaymentProvider } from '../payments/razorpay.js';
 import type { CafesRepository } from '../repositories/cafes.js';
 import type { OrdersRepository } from '../repositories/orders.js';
-import { buildTestApp } from '../../test/helpers.js';
 import { paymentsRoutes } from './payments.js';
 
 const CAFE_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -88,6 +88,7 @@ function createMockOrdersRepo() {
     create: vi.fn(),
     listByCafe: vi.fn(),
     listBySession: vi.fn(),
+    listKitchenTickets: vi.fn(),
     findByIdAndCafe: vi.fn(),
     updateStatus: vi.fn(),
     todayStats: vi.fn(),
@@ -209,9 +210,7 @@ describe('payments endpoints', () => {
 
     it('returns 409 PAYMENT_CONFLICT when already paid', async () => {
       const ordersRepo = createMockOrdersRepo();
-      ordersRepo.findByIdAndCafe.mockResolvedValue(
-        makeOrderWithItems({ paymentStatus: 'paid' }),
-      );
+      ordersRepo.findByIdAndCafe.mockResolvedValue(makeOrderWithItems({ paymentStatus: 'paid' }));
       app = await buildPaymentsApp({ ordersRepo, provider: createStubProvider() });
 
       const res = await app.inject({
@@ -253,9 +252,7 @@ describe('payments endpoints', () => {
 
     it('allows retry when failed', async () => {
       const ordersRepo = createMockOrdersRepo();
-      ordersRepo.findByIdAndCafe.mockResolvedValue(
-        makeOrderWithItems({ paymentStatus: 'failed' }),
-      );
+      ordersRepo.findByIdAndCafe.mockResolvedValue(makeOrderWithItems({ paymentStatus: 'failed' }));
       ordersRepo.setPaymentPending.mockResolvedValue(
         makeOrder({ paymentStatus: 'pending', providerOrderId: PROVIDER_ORDER_ID }),
       );

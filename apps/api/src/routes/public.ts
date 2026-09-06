@@ -4,9 +4,13 @@ import { z } from 'zod';
 import { askWaiter } from '../ai/waiter.js';
 import { cacheKey, getCache } from '../lib/cache.js';
 import { OrderBuildError, buildOrder, gstRateBpFor } from '../orders/build.js';
-import { createDrizzleCafesRepo, type CafesRepository } from '../repositories/cafes.js';
-import { createDrizzleMenuRepo, type MenuRepository } from '../repositories/menu.js';
-import { createDrizzleOrdersRepo, type NewOrder, type OrdersRepository } from '../repositories/orders.js';
+import { type CafesRepository, createDrizzleCafesRepo } from '../repositories/cafes.js';
+import { type MenuRepository, createDrizzleMenuRepo } from '../repositories/menu.js';
+import {
+  type NewOrder,
+  type OrdersRepository,
+  createDrizzleOrdersRepo,
+} from '../repositories/orders.js';
 
 export interface PublicRoutesOptions {
   cafesRepository?: CafesRepository;
@@ -201,12 +205,23 @@ export async function publicRoutes(
     }
     const body = aiSchema.parse(request.body);
     const menu = await menuRepo.getFullMenu(cafe.id);
-    return askWaiter(
-      { apiKey, baseUrl: app.config.DEEPSEEK_BASE_URL, model: app.config.DEEPSEEK_MODEL },
-      cafe,
-      menu,
-      body.message,
-      body.history ?? [],
-    );
+    try {
+      return await askWaiter(
+        { apiKey, baseUrl: app.config.DEEPSEEK_BASE_URL, model: app.config.DEEPSEEK_MODEL },
+        cafe,
+        menu,
+        body.message,
+        body.history ?? [],
+      );
+    } catch (err) {
+      // Never leak provider internals (status codes, JSON, keys) to the diner.
+      app.log.error({ err }, 'ai-waiter provider error');
+      return reply.status(502).send({
+        error: {
+          code: 'AI_UPSTREAM_ERROR',
+          message: 'The waiter is taking a break — please ask a server for help.',
+        },
+      });
+    }
   });
 }

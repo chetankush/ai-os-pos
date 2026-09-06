@@ -1,10 +1,10 @@
-import { schema, type Database } from '@sangam/db';
+import { type Database, schema } from '@sangam/db';
 import type {
   Order,
   OrderItem,
   OrderPayment,
-  OrderStatus,
   OrderStatsResponse,
+  OrderStatus,
   OrderWithItems,
   PaymentMethod,
   PaymentStatus,
@@ -45,6 +45,11 @@ export interface OrdersRepository {
   listByCafe(cafeId: string, limit?: number): Promise<Order[]>;
   /** All orders (with items) attached to a table session, oldest first. */
   listBySession(sessionId: string, cafeId: string): Promise<OrderWithItems[]>;
+  /**
+   * Active kitchen tickets — orders still being made (pending/preparing/ready),
+   * with their items, oldest-first so the kitchen works the queue FIFO.
+   */
+  listKitchenTickets(cafeId: string): Promise<OrderWithItems[]>;
   findByIdAndCafe(id: string, cafeId: string): Promise<OrderWithItems | null>;
   updateStatus(
     id: string,
@@ -66,11 +71,7 @@ export interface OrdersRepository {
   /** Look up an order (with items) by its human-facing order number. */
   findByOrderNumber(orderNumber: string, cafeId: string): Promise<OrderWithItems | null>;
   /** Diner started online payment: store the provider order id, mark pending. */
-  setPaymentPending(
-    id: string,
-    cafeId: string,
-    providerOrderId: string,
-  ): Promise<Order | null>;
+  setPaymentPending(id: string, cafeId: string, providerOrderId: string): Promise<Order | null>;
   /** Signature verified: mark paid, record the provider payment id + paidAt. */
   markPaid(id: string, cafeId: string, providerPaymentId: string): Promise<Order | null>;
   /** Signature verification failed: mark the payment failed (retry allowed). */
@@ -177,13 +178,39 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
       const orderRows = await db
         .select()
         .from(schema.orders)
+        .where(and(eq(schema.orders.tableSessionId, sessionId), eq(schema.orders.cafeId, cafeId)))
+        .orderBy(schema.orders.createdAt);
+
+      if (orderRows.length === 0) return [];
+
+      const ids = orderRows.map((o) => o.id);
+      const itemRows = await db
+        .select()
+        .from(schema.orderItems)
+        .where(inArray(schema.orderItems.orderId, ids));
+
+      const byOrder = new Map<string, OrderItem[]>();
+      for (const item of itemRows) {
+        const list = byOrder.get(item.orderId) ?? [];
+        list.push(item);
+        byOrder.set(item.orderId, list);
+      }
+      return orderRows.map((o) => ({ ...o, items: byOrder.get(o.id) ?? [] }));
+    },
+
+    async listKitchenTickets(cafeId) {
+      // Only the in-kitchen states; completed/cancelled have left the line.
+      const orderRows = await db
+        .select()
+        .from(schema.orders)
         .where(
           and(
-            eq(schema.orders.tableSessionId, sessionId),
             eq(schema.orders.cafeId, cafeId),
+            inArray(schema.orders.status, ['pending', 'preparing', 'ready']),
           ),
         )
-        .orderBy(schema.orders.createdAt);
+        // Oldest first — the kitchen clears the queue FIFO.
+        .orderBy(asc(schema.orders.createdAt));
 
       if (orderRows.length === 0) return [];
 
@@ -368,12 +395,7 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
         db
           .select({ status: schema.orders.status, count: count() })
           .from(schema.orders)
-          .where(
-            and(
-              eq(schema.orders.cafeId, cafeId),
-              gte(schema.orders.createdAt, todayIso),
-            ),
-          )
+          .where(and(eq(schema.orders.cafeId, cafeId), gte(schema.orders.createdAt, todayIso)))
           .groupBy(schema.orders.status),
         db
           .select({
@@ -432,12 +454,7 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
         })
         .from(schema.orderItems)
         .innerJoin(schema.orders, eq(schema.orderItems.orderId, schema.orders.id))
-        .where(
-          and(
-            eq(schema.orders.cafeId, cafeId),
-            gte(schema.orders.createdAt, todayIso),
-          ),
-        )
+        .where(and(eq(schema.orders.cafeId, cafeId), gte(schema.orders.createdAt, todayIso)))
         .groupBy(schema.orderItems.itemNameSnapshot)
         .orderBy(desc(sum(schema.orderItems.quantity)))
         .limit(limit);
@@ -480,12 +497,7 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
       const [orderRow] = await db
         .select()
         .from(schema.orders)
-        .where(
-          and(
-            eq(schema.orders.orderNumber, orderNumber),
-            eq(schema.orders.cafeId, cafeId),
-          ),
-        )
+        .where(and(eq(schema.orders.orderNumber, orderNumber), eq(schema.orders.cafeId, cafeId)))
         .limit(1);
 
       if (!orderRow) return null;

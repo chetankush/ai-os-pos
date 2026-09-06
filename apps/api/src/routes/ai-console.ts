@@ -1,19 +1,14 @@
 import type { OrderStatus, PaymentMethod } from '@sangam/types';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import {
-  type AgentResult,
-  type ToolExecutor,
-  type ToolSpec,
-  runAgent,
-} from '../ai/agent.js';
+import { type AgentResult, type ToolExecutor, type ToolSpec, runAgent } from '../ai/agent.js';
 import {
   type AiConsoleMessagesRepository,
   createDrizzleAiConsoleMessagesRepo,
 } from '../repositories/ai-console-messages.js';
-import { createDrizzleCafesRepo, type CafesRepository } from '../repositories/cafes.js';
-import { createDrizzleMenuRepo, type MenuRepository } from '../repositories/menu.js';
-import { createDrizzleOrdersRepo, type OrdersRepository } from '../repositories/orders.js';
+import { type CafesRepository, createDrizzleCafesRepo } from '../repositories/cafes.js';
+import { type MenuRepository, createDrizzleMenuRepo } from '../repositories/menu.js';
+import { type OrdersRepository, createDrizzleOrdersRepo } from '../repositories/orders.js';
 
 type RunAgentFn = typeof runAgent;
 
@@ -57,14 +52,20 @@ const TOOL_SPECS: ToolSpec[] = [
     parameters: {
       type: 'object',
       properties: {
-        limit: { type: 'integer', minimum: 1, maximum: 25, description: 'How many to return (default 5).' },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 25,
+          description: 'How many to return (default 5).',
+        },
       },
       additionalProperties: false,
     },
   },
   {
     name: 'get_item_sales',
-    description: "How much of a specific item sold today (quantity + revenue). Matches the name loosely.",
+    description:
+      'How much of a specific item sold today (quantity + revenue). Matches the name loosely.',
     parameters: {
       type: 'object',
       properties: { name: { type: 'string', description: 'Item name to look up, e.g. "samosa".' } },
@@ -83,8 +84,16 @@ const TOOL_SPECS: ToolSpec[] = [
     parameters: {
       type: 'object',
       properties: {
-        status: { type: 'string', enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'] },
-        limit: { type: 'integer', minimum: 1, maximum: 50, description: 'How many to return (default 10).' },
+        status: {
+          type: 'string',
+          enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'],
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 50,
+          description: 'How many to return (default 10).',
+        },
       },
       additionalProperties: false,
     },
@@ -111,7 +120,10 @@ const TOOL_SPECS: ToolSpec[] = [
       type: 'object',
       properties: {
         orderNumber: { type: 'string' },
-        status: { type: 'string', enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'] },
+        status: {
+          type: 'string',
+          enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'],
+        },
         paymentMethod: { type: 'string', enum: ['cash', 'upi', 'card', 'online'] },
       },
       required: ['orderNumber', 'status'],
@@ -120,13 +132,7 @@ const TOOL_SPECS: ToolSpec[] = [
   },
 ];
 
-const ORDER_STATUSES: OrderStatus[] = [
-  'pending',
-  'preparing',
-  'ready',
-  'completed',
-  'cancelled',
-];
+const ORDER_STATUSES: OrderStatus[] = ['pending', 'preparing', 'ready', 'completed', 'cancelled'];
 const PAYMENT_METHODS: PaymentMethod[] = ['cash', 'upi', 'card', 'online'];
 
 function asString(v: unknown): string | undefined {
@@ -242,8 +248,7 @@ export async function aiConsoleRoutes(
   const cafesRepo = opts.cafesRepository ?? createDrizzleCafesRepo(app.db);
   const ordersRepo = opts.ordersRepository ?? createDrizzleOrdersRepo(app.db);
   const menuRepo = opts.menuRepository ?? createDrizzleMenuRepo(app.db);
-  const messagesRepo =
-    opts.messagesRepository ?? createDrizzleAiConsoleMessagesRepo(app.db);
+  const messagesRepo = opts.messagesRepository ?? createDrizzleAiConsoleMessagesRepo(app.db);
   const agent: RunAgentFn = opts.runAgent ?? runAgent;
 
   async function ensureOwner(cafeId: string, ownerId: string) {
@@ -310,22 +315,36 @@ export async function aiConsoleRoutes(
         `Money is in paise; present it as ₹ (divide by 100).`,
         `Be concise; use short sentences and small lists.`,
         `Confirm before destructive actions.`,
+        // The product uses lucide icons everywhere; emoji bullets/checkmarks
+        // look amateur next to that and were flagged by an audit. Hard rule.
+        `NEVER use emojis (no 📦/✅/📃/🚀/etc.). Use plain bullets ("- ") and "Yes"/"No"/"Done" instead.`,
       ].join(' ');
 
       const executor = buildExecutor(cafeId, ordersRepo, menuRepo);
 
-      const result: AgentResult = await agent(
-        {
-          apiKey,
-          baseUrl: app.config.DEEPSEEK_BASE_URL,
-          model: app.config.DEEPSEEK_MODEL,
-        },
-        systemPrompt,
-        TOOL_SPECS,
-        executor,
-        body.message,
-        history,
-      );
+      let result: AgentResult;
+      try {
+        result = await agent(
+          {
+            apiKey,
+            baseUrl: app.config.DEEPSEEK_BASE_URL,
+            model: app.config.DEEPSEEK_MODEL,
+          },
+          systemPrompt,
+          TOOL_SPECS,
+          executor,
+          body.message,
+          history,
+        );
+      } catch (err) {
+        app.log.error({ err }, 'ai-console provider error');
+        return reply.status(502).send({
+          error: {
+            code: 'AI_UPSTREAM_ERROR',
+            message: 'The AI manager is temporarily unavailable. Please try again in a moment.',
+          },
+        });
+      }
 
       // Persist the turn only after a successful reply (no dangling user msg).
       await messagesRepo.append(cafeId, { role: 'user', content: body.message });

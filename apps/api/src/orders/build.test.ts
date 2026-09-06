@@ -74,6 +74,8 @@ const MENU: MenuCategoryWithItems[] = [
         name: 'Cappuccino',
         description: null,
         basePricePaise: 15000,
+        hsnCode: null,
+        gstRateBpOverride: null,
         imageUrl: null,
         isVegetarian: true,
         isVegan: false,
@@ -91,6 +93,8 @@ const MENU: MenuCategoryWithItems[] = [
         name: 'OOS Tea',
         description: null,
         basePricePaise: 10000,
+        hsnCode: null,
+        gstRateBpOverride: null,
         imageUrl: null,
         isVegetarian: true,
         isVegan: false,
@@ -135,18 +139,16 @@ describe('buildOrder GST math by gstMode', () => {
   });
 
   it('exempt charges no GST on the bill', () => {
-    const built = buildOrder({ gstMode: 'exempt' }, MENU, [
-      { menuItemId: 'item-1', quantity: 1 },
-    ]);
+    const built = buildOrder({ gstMode: 'exempt' }, MENU, [{ menuItemId: 'item-1', quantity: 1 }]);
     expect(built.gstRateBp).toBe(0);
     expect(built.taxPaise).toBe(0);
     expect(built.totalPaise).toBe(15000);
   });
 
   it('rejects an unknown item', () => {
-    expect(() => buildOrder({ gstMode: 'regular_5' }, MENU, [{ menuItemId: 'nope', quantity: 1 }])).toThrow(
-      OrderBuildError,
-    );
+    expect(() =>
+      buildOrder({ gstMode: 'regular_5' }, MENU, [{ menuItemId: 'nope', quantity: 1 }]),
+    ).toThrow(OrderBuildError);
   });
 
   it('rejects an unavailable item', () => {
@@ -156,7 +158,9 @@ describe('buildOrder GST math by gstMode', () => {
   });
 
   it('with no adjustments, totals are unchanged (regression)', () => {
-    const built = buildOrder({ gstMode: 'regular_5' }, MENU, [{ menuItemId: 'item-1', quantity: 2 }]);
+    const built = buildOrder({ gstMode: 'regular_5' }, MENU, [
+      { menuItemId: 'item-1', quantity: 2 },
+    ]);
     expect(built.discountPaise).toBe(0);
     expect(built.serviceChargePaise).toBe(0);
     expect(built.packagingChargePaise).toBe(0);

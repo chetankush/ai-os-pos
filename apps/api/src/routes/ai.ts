@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { askWaiter } from '../ai/waiter.js';
-import { createDrizzleCafesRepo, type CafesRepository } from '../repositories/cafes.js';
-import { createDrizzleMenuRepo, type MenuRepository } from '../repositories/menu.js';
+import { type CafesRepository, createDrizzleCafesRepo } from '../repositories/cafes.js';
+import { type MenuRepository, createDrizzleMenuRepo } from '../repositories/menu.js';
 
 export interface AiRoutesOptions {
   cafesRepository?: CafesRepository;
@@ -46,17 +46,26 @@ export async function aiRoutes(app: FastifyInstance, opts: AiRoutesOptions = {})
     const body = bodySchema.parse(request.body);
     const menu = await menuRepo.getFullMenu(cafeId);
 
-    const result = await askWaiter(
-      {
-        apiKey,
-        baseUrl: app.config.DEEPSEEK_BASE_URL,
-        model: app.config.DEEPSEEK_MODEL,
-      },
-      cafe,
-      menu,
-      body.message,
-      body.history ?? [],
-    );
-    return result;
+    try {
+      return await askWaiter(
+        {
+          apiKey,
+          baseUrl: app.config.DEEPSEEK_BASE_URL,
+          model: app.config.DEEPSEEK_MODEL,
+        },
+        cafe,
+        menu,
+        body.message,
+        body.history ?? [],
+      );
+    } catch (err) {
+      app.log.error({ err }, 'ai-waiter provider error (owner preview)');
+      return reply.status(502).send({
+        error: {
+          code: 'AI_UPSTREAM_ERROR',
+          message: 'The AI waiter is temporarily unavailable.',
+        },
+      });
+    }
   });
 }

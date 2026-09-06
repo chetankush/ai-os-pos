@@ -1,18 +1,18 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { cacheKey, getCache } from '../lib/cache.js';
-import { createDrizzleCafesRepo, type CafesRepository } from '../repositories/cafes.js';
-import { createDrizzleMenuRepo, type MenuRepository } from '../repositories/menu.js';
-import {
-  createDrizzleOrdersRepo,
-  type NewOrder,
-  type OrdersRepository,
-} from '../repositories/orders.js';
+import { OrderBuildError, buildOrder } from '../orders/build.js';
 import {
   type AuditLogsRepository,
   createDrizzleAuditLogsRepo,
 } from '../repositories/audit-logs.js';
-import { OrderBuildError, buildOrder } from '../orders/build.js';
+import { type CafesRepository, createDrizzleCafesRepo } from '../repositories/cafes.js';
+import { type MenuRepository, createDrizzleMenuRepo } from '../repositories/menu.js';
+import {
+  type NewOrder,
+  type OrdersRepository,
+  createDrizzleOrdersRepo,
+} from '../repositories/orders.js';
 
 export interface OrdersRoutesOptions {
   repository?: OrdersRepository;
@@ -112,70 +112,81 @@ export async function ordersRoutes(
 
   // ─── POST /cafes/:cafeId/orders ─────────────────────────────────────────────
 
-  app.post(
-    '/cafes/:cafeId/orders',
-    { preHandler: app.authenticate },
-    async (request, reply) => {
-      const { cafeId } = cafeParamsSchema.parse(request.params);
-      const cafe = await getOwnedCafe(cafeId, request.user.id);
-      if (!cafe) {
-        return reply.status(404).send({
-          error: { code: 'NOT_FOUND', message: 'Cafe not found' },
+  app.post('/cafes/:cafeId/orders', { preHandler: app.authenticate }, async (request, reply) => {
+    const { cafeId } = cafeParamsSchema.parse(request.params);
+    const cafe = await getOwnedCafe(cafeId, request.user.id);
+    if (!cafe) {
+      return reply.status(404).send({
+        error: { code: 'NOT_FOUND', message: 'Cafe not found' },
+      });
+    }
+
+    const body = createOrderBodySchema.parse(request.body);
+    const menu = await menuRepo.getFullMenu(cafeId);
+
+    let built: ReturnType<typeof buildOrder>;
+    try {
+      built = buildOrder(cafe, menu, body.items, {
+        discount: body.discount,
+        serviceChargeBp: body.serviceChargeBp,
+        packagingChargePaise: body.packagingChargePaise,
+        roundOff: body.roundOff,
+      });
+    } catch (err) {
+      if (err instanceof OrderBuildError) {
+        return reply.status(400).send({
+          error: { code: err.code, message: err.message },
         });
       }
+      throw err;
+    }
 
-      const body = createOrderBodySchema.parse(request.body);
-      const menu = await menuRepo.getFullMenu(cafeId);
+    const newOrder: NewOrder = {
+      cafeId,
+      source: body.source ?? 'counter',
+      tableLabel: body.tableLabel ?? null,
+      tableSessionId: body.tableSessionId ?? null,
+      customerName: body.customerName ?? null,
+      customerPhone: body.customerPhone ?? null,
+      notes: body.notes ?? null,
+      subtotalPaise: built.subtotalPaise,
+      discountPaise: built.discountPaise,
+      discountReason: built.discountReason,
+      serviceChargePaise: built.serviceChargePaise,
+      packagingChargePaise: built.packagingChargePaise,
+      taxPaise: built.taxPaise,
+      roundOffPaise: built.roundOffPaise,
+      totalPaise: built.totalPaise,
+      gstRateBp: built.gstRateBp,
+      items: built.items,
+    };
 
-      let built: ReturnType<typeof buildOrder>;
-      try {
-        built = buildOrder(cafe, menu, body.items, {
-          discount: body.discount,
-          serviceChargeBp: body.serviceChargeBp,
-          packagingChargePaise: body.packagingChargePaise,
-          roundOff: body.roundOff,
-        });
-      } catch (err) {
-        if (err instanceof OrderBuildError) {
-          return reply.status(400).send({
-            error: { code: err.code, message: err.message },
-          });
-        }
-        throw err;
-      }
-
-      const newOrder: NewOrder = {
-        cafeId,
-        source: body.source ?? 'counter',
-        tableLabel: body.tableLabel ?? null,
-        tableSessionId: body.tableSessionId ?? null,
-        customerName: body.customerName ?? null,
-        customerPhone: body.customerPhone ?? null,
-        notes: body.notes ?? null,
-        subtotalPaise: built.subtotalPaise,
-        discountPaise: built.discountPaise,
-        discountReason: built.discountReason,
-        serviceChargePaise: built.serviceChargePaise,
-        packagingChargePaise: built.packagingChargePaise,
-        taxPaise: built.taxPaise,
-        roundOffPaise: built.roundOffPaise,
-        totalPaise: built.totalPaise,
-        gstRateBp: built.gstRateBp,
-        items: built.items,
-      };
-
-      // The bill number is a gapless serial allocated atomically inside the
-      // create() transaction — no client-side number, no retry-on-collision.
-      const order = await ordersRepo.create(newOrder);
-      await cache.del(statsKey(cafeId));
-      return reply.status(201).send({ order });
-    },
-  );
+    // The bill number is a gapless serial allocated atomically inside the
+    // create() transaction — no client-side number, no retry-on-collision.
+    const order = await ordersRepo.create(newOrder);
+    await cache.del(statsKey(cafeId));
+    return reply.status(201).send({ order });
+  });
 
   // ─── GET /cafes/:cafeId/orders ──────────────────────────────────────────────
 
+  app.get('/cafes/:cafeId/orders', { preHandler: app.authenticate }, async (request, reply) => {
+    const { cafeId } = cafeParamsSchema.parse(request.params);
+    if (!(await getOwnedCafe(cafeId, request.user.id))) {
+      return reply.status(404).send({
+        error: { code: 'NOT_FOUND', message: 'Cafe not found' },
+      });
+    }
+    const orders = await ordersRepo.listByCafe(cafeId, 50);
+    return { orders };
+  });
+
+  // ─── GET /cafes/:cafeId/kitchen/tickets ─────────────────────────────────────
+  // The Kitchen Display feed: active orders (pending/preparing/ready) with their
+  // line items, oldest-first. The board bumps tickets via PATCH .../status.
+
   app.get(
-    '/cafes/:cafeId/orders',
+    '/cafes/:cafeId/kitchen/tickets',
     { preHandler: app.authenticate },
     async (request, reply) => {
       const { cafeId } = cafeParamsSchema.parse(request.params);
@@ -184,8 +195,8 @@ export async function ordersRoutes(
           error: { code: 'NOT_FOUND', message: 'Cafe not found' },
         });
       }
-      const orders = await ordersRepo.listByCafe(cafeId, 50);
-      return { orders };
+      const tickets = await ordersRepo.listKitchenTickets(cafeId);
+      return { tickets };
     },
   );
 
@@ -247,9 +258,7 @@ export async function ordersRoutes(
           error: { code: 'NOT_FOUND', message: 'Cafe not found' },
         });
       }
-      const { status: nextStatus, paymentMethod } = updateStatusBodySchema.parse(
-        request.body,
-      );
+      const { status: nextStatus, paymentMethod } = updateStatusBodySchema.parse(request.body);
 
       const current = await ordersRepo.findByIdAndCafe(orderId, cafeId);
       if (!current) {
@@ -268,12 +277,7 @@ export async function ordersRoutes(
         });
       }
 
-      const updated = await ordersRepo.updateStatus(
-        orderId,
-        cafeId,
-        nextStatus,
-        paymentMethod,
-      );
+      const updated = await ordersRepo.updateStatus(orderId, cafeId, nextStatus, paymentMethod);
       if (!updated) {
         return reply.status(404).send({
           error: { code: 'NOT_FOUND', message: 'Order not found' },
@@ -368,7 +372,11 @@ export async function ordersRoutes(
         entityType: 'order',
         entityId: orderId,
         summary: `Refunded ₹${body.amountPaise / 100} (${body.method}) on ${current.orderNumber}`,
-        metadata: { amountPaise: body.amountPaise, method: body.method, reason: body.reason ?? null },
+        metadata: {
+          amountPaise: body.amountPaise,
+          method: body.method,
+          reason: body.reason ?? null,
+        },
       });
 
       await cache.del(statsKey(cafeId));

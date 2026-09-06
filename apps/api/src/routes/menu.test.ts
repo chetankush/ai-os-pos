@@ -1,6 +1,7 @@
 import type { Cafe, MenuCategory, MenuItem } from '@sangam/types';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildTestApp } from '../../test/helpers.js';
 import type { CafesRepository } from '../repositories/cafes.js';
 import type {
   MenuRepository,
@@ -8,7 +9,6 @@ import type {
   NewMenuItem,
   UpdateMenuItem,
 } from '../repositories/menu.js';
-import { buildTestApp } from '../../test/helpers.js';
 import { menuRoutes } from './menu.js';
 
 const JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
@@ -63,6 +63,8 @@ function makeItem(overrides: Partial<MenuItem> = {}): MenuItem {
     name: 'Cappuccino',
     description: null,
     basePricePaise: 15000,
+    hsnCode: null,
+    gstRateBpOverride: null,
     imageUrl: null,
     isVegetarian: true,
     isVegan: false,
@@ -82,7 +84,8 @@ function createMockMenuRepo() {
     categoryExists: vi.fn<(categoryId: string, cafeId: string) => Promise<boolean>>(),
     createCategory: vi.fn<(d: NewMenuCategory) => Promise<MenuCategory>>(),
     createItem: vi.fn<(d: NewMenuItem) => Promise<MenuItem>>(),
-    updateItem: vi.fn<(id: string, cafeId: string, p: UpdateMenuItem) => Promise<MenuItem | null>>(),
+    updateItem:
+      vi.fn<(id: string, cafeId: string, p: UpdateMenuItem) => Promise<MenuItem | null>>(),
     deleteItem: vi.fn<(id: string, cafeId: string) => Promise<boolean>>(),
   } satisfies MenuRepository;
 }
@@ -110,8 +113,14 @@ describe('menu endpoints', () => {
     });
     await app.ready();
 
-    ownerToken = app.jwt.sign({ sub: OWNER_ID, email: 'owner@test.in', aud: 'authenticated' }, { expiresIn: '1h' });
-    otherToken = app.jwt.sign({ sub: OTHER_ID, email: 'other@test.in', aud: 'authenticated' }, { expiresIn: '1h' });
+    ownerToken = app.jwt.sign(
+      { sub: OWNER_ID, email: 'owner@test.in', aud: 'authenticated' },
+      { expiresIn: '1h' },
+    );
+    otherToken = app.jwt.sign(
+      { sub: OTHER_ID, email: 'other@test.in', aud: 'authenticated' },
+      { expiresIn: '1h' },
+    );
   });
 
   afterAll(async () => {
@@ -133,9 +142,7 @@ describe('menu endpoints', () => {
 
   describe('GET /cafes/:cafeId/menu', () => {
     it('returns categories with items grouped', async () => {
-      menuRepo.getFullMenu.mockResolvedValueOnce([
-        { ...makeCategory(), items: [makeItem()] },
-      ]);
+      menuRepo.getFullMenu.mockResolvedValueOnce([{ ...makeCategory(), items: [makeItem()] }]);
 
       const res = await app.inject({
         method: 'GET',
@@ -248,6 +255,93 @@ describe('menu endpoints', () => {
       );
     });
 
+    it('persists hsnCode and gstRateBpOverride when provided', async () => {
+      menuRepo.createItem.mockResolvedValueOnce(
+        makeItem({ hsnCode: '996331', gstRateBpOverride: 1800 }),
+      );
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/menu/items`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: {
+          categoryId: CAT_ID,
+          name: 'Cappuccino',
+          basePricePaise: 15000,
+          hsnCode: '996331',
+          gstRateBpOverride: 1800,
+        },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json().item.hsnCode).toBe('996331');
+      expect(res.json().item.gstRateBpOverride).toBe(1800);
+      expect(menuRepo.createItem).toHaveBeenCalledWith(
+        expect.objectContaining({ hsnCode: '996331', gstRateBpOverride: 1800 }),
+      );
+    });
+
+    it('defaults hsnCode and gstRateBpOverride to null when omitted', async () => {
+      menuRepo.createItem.mockResolvedValueOnce(makeItem());
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/menu/items`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { categoryId: CAT_ID, name: 'Cappuccino', basePricePaise: 15000 },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(menuRepo.createItem).toHaveBeenCalledWith(
+        expect.objectContaining({ hsnCode: null, gstRateBpOverride: null }),
+      );
+    });
+
+    it('rejects a non-digit hsnCode', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/menu/items`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: {
+          categoryId: CAT_ID,
+          name: 'Cappuccino',
+          basePricePaise: 15000,
+          hsnCode: 'ABC123',
+        },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('rejects an hsnCode longer than 8 chars', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/menu/items`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: {
+          categoryId: CAT_ID,
+          name: 'Cappuccino',
+          basePricePaise: 15000,
+          hsnCode: '123456789',
+        },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('rejects a gstRateBpOverride above 2800', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/menu/items`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: {
+          categoryId: CAT_ID,
+          name: 'Cappuccino',
+          basePricePaise: 15000,
+          gstRateBpOverride: 2900,
+        },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
     it('rejects negative prices', async () => {
       const res = await app.inject({
         method: 'POST',
@@ -295,6 +389,46 @@ describe('menu endpoints', () => {
       expect(res.json().item.isAvailable).toBe(false);
     });
 
+    it('updates hsnCode and gstRateBpOverride', async () => {
+      menuRepo.updateItem.mockResolvedValueOnce(
+        makeItem({ hsnCode: '996331', gstRateBpOverride: 500 }),
+      );
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/cafes/${CAFE_ID}/menu/items/${ITEM_ID}`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { hsnCode: '996331', gstRateBpOverride: 500 },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().item.hsnCode).toBe('996331');
+      expect(res.json().item.gstRateBpOverride).toBe(500);
+      expect(menuRepo.updateItem).toHaveBeenCalledWith(
+        ITEM_ID,
+        CAFE_ID,
+        expect.objectContaining({ hsnCode: '996331', gstRateBpOverride: 500 }),
+      );
+    });
+
+    it('clears gstRateBpOverride when set to null', async () => {
+      menuRepo.updateItem.mockResolvedValueOnce(makeItem({ gstRateBpOverride: null }));
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/cafes/${CAFE_ID}/menu/items/${ITEM_ID}`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { gstRateBpOverride: null },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(menuRepo.updateItem).toHaveBeenCalledWith(
+        ITEM_ID,
+        CAFE_ID,
+        expect.objectContaining({ gstRateBpOverride: null }),
+      );
+    });
+
     it('returns 404 if item not found', async () => {
       menuRepo.updateItem.mockResolvedValueOnce(null);
 
@@ -334,6 +468,143 @@ describe('menu endpoints', () => {
       });
 
       expect(res.statusCode).toBe(404);
+    });
+  });
+
+  // ─── POST /cafes/:cafeId/menu/import ────────────────────────────────────────
+
+  describe('POST /cafes/:cafeId/menu/import', () => {
+    it('creates categories + items from a CSV', async () => {
+      // No existing categories — every category in the CSV is new.
+      menuRepo.getFullMenu.mockResolvedValueOnce([]);
+      menuRepo.createCategory
+        .mockResolvedValueOnce(makeCategory({ id: 'cat-bev', name: 'Beverages' }))
+        .mockResolvedValueOnce(makeCategory({ id: 'cat-main', name: 'Mains' }));
+      menuRepo.createItem.mockResolvedValue(makeItem());
+
+      const csv = [
+        'category,name,price,veg,spice',
+        'Beverages,Tea,40,yes,0',
+        'Beverages,Coffee,60,yes,0',
+        'Mains,Paneer,280,yes,2',
+      ].join('\n');
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/menu/import`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { csv },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.categoriesCreated).toBe(2);
+      expect(body.itemsCreated).toBe(3);
+      expect(body.skipped).toBe(0);
+      expect(body.errors).toEqual([]);
+      expect(menuRepo.createCategory).toHaveBeenCalledTimes(2);
+      expect(menuRepo.createItem).toHaveBeenCalledTimes(3);
+    });
+
+    it('reuses an existing category by name (case-insensitive) instead of recreating it', async () => {
+      menuRepo.getFullMenu.mockResolvedValueOnce([
+        { ...makeCategory({ id: 'cat-bev', name: 'Beverages' }), items: [] },
+      ]);
+      menuRepo.createItem.mockResolvedValue(makeItem());
+
+      const csv = ['category,name,price', 'beverages,Tea,40'].join('\n');
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/menu/import`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { csv },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.categoriesCreated).toBe(0);
+      expect(body.itemsCreated).toBe(1);
+      expect(menuRepo.createCategory).not.toHaveBeenCalled();
+      expect(menuRepo.createItem).toHaveBeenCalledWith(
+        expect.objectContaining({ categoryId: 'cat-bev', name: 'Tea', basePricePaise: 4000 }),
+      );
+    });
+
+    it('passes parsed prices through as paise and maps veg + spice', async () => {
+      menuRepo.getFullMenu.mockResolvedValueOnce([]);
+      menuRepo.createCategory.mockResolvedValueOnce(
+        makeCategory({ id: 'cat-main', name: 'Mains' }),
+      );
+      menuRepo.createItem.mockResolvedValue(makeItem());
+
+      const csv = ['category,name,price,veg,spice', 'Mains,Chicken,320.50,no,3'].join('\n');
+
+      await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/menu/import`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { csv },
+      });
+
+      expect(menuRepo.createItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          basePricePaise: 32050,
+          isVegetarian: false,
+          spiceLevel: 3,
+        }),
+      );
+    });
+
+    it('returns parse errors and creates nothing when the CSV is malformed', async () => {
+      const csv = ['name,price', 'Tea,40'].join('\n'); // missing category column
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/menu/import`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { csv },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.itemsCreated).toBe(0);
+      expect(body.categoriesCreated).toBe(0);
+      expect(body.errors.length).toBeGreaterThan(0);
+      expect(menuRepo.createItem).not.toHaveBeenCalled();
+    });
+
+    it('imports good rows and reports bad ones as skipped', async () => {
+      menuRepo.getFullMenu.mockResolvedValueOnce([]);
+      menuRepo.createCategory.mockResolvedValueOnce(
+        makeCategory({ id: 'cat-bev', name: 'Beverages' }),
+      );
+      menuRepo.createItem.mockResolvedValue(makeItem());
+
+      const csv = ['category,name,price', 'Beverages,Tea,40', 'Beverages,Bad,abc'].join('\n');
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/menu/import`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { csv },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.itemsCreated).toBe(1);
+      expect(body.skipped).toBe(1);
+      expect(body.errors).toHaveLength(1);
+    });
+
+    it('rejects a missing csv body', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/menu/import`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: {},
+      });
+      expect(res.statusCode).toBe(400);
     });
   });
 

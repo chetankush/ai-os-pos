@@ -1,0 +1,81 @@
+# Render Blueprint for the Sangam backend (apps/api).
+#
+# Deploy:  Render dashboard → New → Blueprint → pick this repo.
+# Render reads this file, creates the API service + Postgres + Redis, and
+# wires DATABASE_URL / REDIS_URL automatically.
+#
+# The frontend (apps/web) is NOT in this blueprint — deploy it to Vercel and
+# point NEXT_PUBLIC_API_URL at this service's URL. See docs/deploy-render.md.
+
+services:
+  - type: web
+    name: sangam-api
+    runtime: node
+    plan: starter          # free plan sleeps after 15 min — a POS must not sleep
+    region: singapore      # closest Render region to India (lowest latency)
+    branch: main
+    healthCheckPath: /health
+
+    # Turbo's `--filter=@sangam/api...` also builds the workspace packages the
+    # API depends on (@sangam/types, @sangam/db) before building the API itself.
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo run build --filter=@sangam/api...
+
+    # Runs migrations before the new version takes traffic. Requires a paid
+    # instance type; on the free plan, delete this and run migrations manually
+    # (see docs/deploy-render.md).
+    preDeployCommand: pnpm --filter @sangam/db db:migrate:prod
+
+    startCommand: pnpm --filter @sangam/api start
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: LOG_LEVEL
+        value: info
+
+      # Wired automatically by Render from the resources declared below.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sangam-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: sangam-redis
+          property: connectionString
+
+      # Set these by hand in the Render dashboard (never commit them).
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: CORS_ORIGINS          # e.g. https://app.sangam.in (comma-separated)
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_BASE_URL
+        value: https://openrouter.ai/api/v1
+      - key: DEEPSEEK_MODEL
+        value: deepseek/deepseek-chat
+
+  - type: redis
+    name: sangam-redis
+    plan: starter
+    region: singapore
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []        # internal-only: reachable from Render services only
+
+databases:
+  - name: sangam-db
+    databaseName: sangam
+    user: sangam
+    plan: basic-256mb
+    region: singapore

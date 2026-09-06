@@ -161,7 +161,7 @@ real time, and a paid order reads `paid / online`.
 
 ## What's seeded
 
-- **Cafe:** Tapri Central — Sector 18, Noida (AC, 18% GST), owned by `admin@testpos.com`.
+- **Cafe:** Tapri Central — Sector 18, Noida (AC · 5% GST under the Sept-2025 reform), owned by `admin@testpos.com`.
 - **Menu:** 25 items in 4 categories, with veg/non-veg/egg markers and spice levels.
 - **Orders:** 9 across all statuses (4 completed = today's revenue, 1 ready, 2 preparing, 1 pending, 1 cancelled) with tables, customers, and realistic times.
 

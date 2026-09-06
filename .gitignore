@@ -43,3 +43,11 @@ coverage/
 
 # Drizzle
 drizzle/migrations/meta/_journal.json.bak
+
+# Claude Code agent worktrees — 7GB of node_modules AND live .env secrets.
+# Never commit this directory.
+.claude/
+
+# Stray artifacts from screenshot/browser tooling
+--full-page
+bp-*.png

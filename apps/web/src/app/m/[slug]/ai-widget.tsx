@@ -1,5 +1,9 @@
 'use client';
 
+import { ChatMarkdown } from '@/components/ui/chat-markdown';
+import { cn } from '@/lib/cn';
+import { getDinerChat, setDinerChat } from '@/lib/diner-chat';
+import type { DinerOrderRecord } from '@/lib/diner-orders';
 import type {
   MenuItem,
   OrderStatus,
@@ -9,10 +13,6 @@ import type {
 import { ArrowLeft, Plus, ReceiptText, Send, ShoppingBag, Sparkles, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { ChatMarkdown } from '@/components/ui/chat-markdown';
-import { cn } from '@/lib/cn';
-import { getDinerChat, setDinerChat } from '@/lib/diner-chat';
-import type { DinerOrderRecord } from '@/lib/diner-orders';
 import { formatRupees } from './diner-order';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -63,15 +63,18 @@ export function AiWidget({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Refresh live order status from the server when "Your orders" is opened —
-  // localStorage holds the snapshot; the server is the source of truth.
+  // Refresh live order status from the server while "Your orders" is open —
+  // localStorage holds the snapshot, the server is the source of truth. Polls
+  // every 15s so "Order placed → Preparing → Ready" updates without the diner
+  // having to reload. Stops polling the moment the view changes or the sheet
+  // closes.
   useEffect(() => {
     if (!open || view !== 'orders' || orders.length === 0) return;
     let cancelled = false;
-    void (async () => {
+
+    async function refresh() {
       const entries = await Promise.all(
         orders.map(async (o) => {
           try {
@@ -93,9 +96,13 @@ export function AiWidget({
       const map: Record<string, LiveStatus> = {};
       for (const e of entries) if (e) map[e[0]] = e[1];
       setLiveById(map);
-    })();
+    }
+
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 15_000);
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
     };
   }, [open, view, orders, slug]);
 
@@ -122,21 +129,26 @@ export function AiWidget({
     setMessages(withUser);
     setDinerChat(slug, withUser);
     setInput('');
-    setError(null);
     setLoading(true);
 
+    // Friendly fallback bubble shown on any failure — never leak provider JSON.
+    const fallback =
+      "I'm having a little trouble right now — try again in a moment, or just flag down a server. 🙏";
+
     try {
-      const res = await fetch(
-        `${API_URL}/public/cafes/${encodeURIComponent(slug)}/ai-waiter`,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ message, history }),
-        },
-      );
+      const res = await fetch(`${API_URL}/public/cafes/${encodeURIComponent(slug)}/ai-waiter`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message, history }),
+      });
       if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error?.message ?? `The waiter is unavailable (${res.status})`);
+        // Show the friendly fallback as an assistant bubble (not a red error
+        // line). Server already wraps upstream failures, so we never render
+        // raw provider output even if it slips through.
+        const final: ChatMessage[] = [...withUser, { role: 'assistant', content: fallback }];
+        setMessages(final);
+        setDinerChat(slug, final);
+        return;
       }
       const data = (await res.json()) as AiReply;
       const final: ChatMessage[] = [
@@ -149,10 +161,10 @@ export function AiWidget({
       ];
       setMessages(final);
       setDinerChat(slug, final);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'The waiter is unavailable right now.',
-      );
+    } catch {
+      const final: ChatMessage[] = [...withUser, { role: 'assistant', content: fallback }];
+      setMessages(final);
+      setDinerChat(slug, final);
     } finally {
       setLoading(false);
     }
@@ -231,143 +243,132 @@ export function AiWidget({
               <OrdersView orders={orders} liveById={liveById} />
             ) : (
               <>
-            <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
-              {messages.length === 0 && (
-                <div className="py-8 text-center">
-                  <p className="text-sm text-muted">
-                    Ask me anything about {cafeName}&apos;s menu — what&apos;s
-                    spicy, what&apos;s vegan, or what to try.
-                  </p>
-                </div>
-              )}
-
-              {messages.map((m, i) => (
-                <div
-                  // biome-ignore lint/suspicious/noArrayIndexKey: chat log is append-only
-                  key={i}
-                  className={cn(
-                    'flex',
-                    m.role === 'user' ? 'justify-end' : 'justify-start',
+                <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
+                  {messages.length === 0 && (
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-muted">
+                        Ask me anything about {cafeName}&apos;s menu — what&apos;s spicy,
+                        what&apos;s vegan, or what to try.
+                      </p>
+                    </div>
                   )}
-                >
-                  <div
+
+                  {messages.map((m, i) => (
+                    <div
+                      // biome-ignore lint/suspicious/noArrayIndexKey: chat log is append-only
+                      key={i}
+                      className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}
+                    >
+                      <div
+                        className={cn(
+                          'max-w-[85%] space-y-2 rounded-2xl px-3.5 py-2.5 text-sm',
+                          m.role === 'user'
+                            ? 'bg-accent text-accent-fg'
+                            : 'border border-border bg-subtle/50 text-fg',
+                        )}
+                      >
+                        {m.role === 'user' ? (
+                          <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+                        ) : (
+                          <ChatMarkdown text={m.content} />
+                        )}
+                        {m.role === 'assistant' &&
+                          m.suggestedItemIds &&
+                          m.suggestedItemIds.length > 0 && (
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              {m.suggestedItemIds
+                                .map((id) => itemsById.get(id))
+                                .filter((it): it is MenuItem => Boolean(it))
+                                .map((it) => (
+                                  <button
+                                    key={it.id}
+                                    type="button"
+                                    onClick={() => {
+                                      onAdd(it.id);
+                                      toast.success(`Added ${it.name}`);
+                                    }}
+                                    className={cn(
+                                      'inline-flex items-center gap-1 rounded-full border border-border bg-bg px-3 py-1.5 text-xs font-medium',
+                                      'hover:bg-subtle hover:border-border-strong active:scale-95 touch-manipulation',
+                                    )}
+                                  >
+                                    <Plus className="size-3" />
+                                    {it.name}
+                                    <span className="text-muted tabular-nums">
+                                      {formatRupees(it.basePricePaise)}
+                                    </span>
+                                  </button>
+                                ))}
+                            </div>
+                          )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {loading && (
+                    <div className="flex justify-start">
+                      <div className="rounded-2xl border border-border bg-subtle/50 px-3.5 py-2.5">
+                        <span className="flex gap-1">
+                          <Dot /> <Dot /> <Dot />
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Live cart — so diners see what they've added without leaving chat */}
+                {itemCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      onViewCart();
+                    }}
                     className={cn(
-                      'max-w-[85%] space-y-2 rounded-2xl px-3.5 py-2.5 text-sm',
-                      m.role === 'user'
-                        ? 'bg-accent text-accent-fg'
-                        : 'border border-border bg-subtle/50 text-fg',
+                      'flex items-center justify-between gap-2 border-t border-border bg-accent px-4 py-3 text-accent-fg',
+                      'transition-transform active:scale-[0.99] touch-manipulation',
                     )}
                   >
-                    {m.role === 'user' ? (
-                      <p className="whitespace-pre-wrap leading-relaxed">
-                        {m.content}
-                      </p>
-                    ) : (
-                      <ChatMarkdown text={m.content} />
-                    )}
-                    {m.role === 'assistant' &&
-                      m.suggestedItemIds &&
-                      m.suggestedItemIds.length > 0 && (
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          {m.suggestedItemIds
-                            .map((id) => itemsById.get(id))
-                            .filter((it): it is MenuItem => Boolean(it))
-                            .map((it) => (
-                              <button
-                                key={it.id}
-                                type="button"
-                                onClick={() => {
-                                  onAdd(it.id);
-                                  toast.success(`Added ${it.name}`);
-                                }}
-                                className={cn(
-                                  'inline-flex items-center gap-1 rounded-full border border-border bg-bg px-3 py-1.5 text-xs font-medium',
-                                  'hover:bg-subtle hover:border-border-strong active:scale-95 touch-manipulation',
-                                )}
-                              >
-                                <Plus className="size-3" />
-                                {it.name}
-                                <span className="text-muted tabular-nums">
-                                  {formatRupees(it.basePricePaise)}
-                                </span>
-                              </button>
-                            ))}
-                        </div>
-                      )}
-                  </div>
-                </div>
-              ))}
-
-              {loading && (
-                <div className="flex justify-start">
-                  <div className="rounded-2xl border border-border bg-subtle/50 px-3.5 py-2.5">
-                    <span className="flex gap-1">
-                      <Dot /> <Dot /> <Dot />
+                    <span className="inline-flex items-center gap-2 text-sm font-medium">
+                      <ShoppingBag className="size-4" />
+                      {itemCount} {itemCount === 1 ? 'item' : 'items'} added
                     </span>
-                  </div>
-                </div>
-              )}
-
-              {error && (
-                <p role="alert" className="text-center text-xs text-danger">
-                  {error}
-                </p>
-              )}
-            </div>
-
-            {/* Live cart — so diners see what they've added without leaving chat */}
-            {itemCount > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  onViewCart();
-                }}
-                className={cn(
-                  'flex items-center justify-between gap-2 border-t border-border bg-accent px-4 py-3 text-accent-fg',
-                  'transition-transform active:scale-[0.99] touch-manipulation',
+                    <span className="text-sm font-semibold tabular-nums">
+                      {formatRupees(subtotalPaise)} · View order
+                    </span>
+                  </button>
                 )}
-              >
-                <span className="inline-flex items-center gap-2 text-sm font-medium">
-                  <ShoppingBag className="size-4" />
-                  {itemCount} {itemCount === 1 ? 'item' : 'items'} added
-                </span>
-                <span className="text-sm font-semibold tabular-nums">
-                  {formatRupees(subtotalPaise)} · View order
-                </span>
-              </button>
-            )}
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void send();
-              }}
-              className="flex items-center gap-2 border-t border-border p-3"
-            >
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="What do you recommend?"
-                aria-label="Message the waiter"
-                className={cn(
-                  'h-11 flex-1 rounded-lg border border-border bg-bg px-3.5 text-base',
-                  'placeholder:text-muted focus:border-fg focus:outline-none focus:ring-2 focus:ring-fg focus:ring-offset-2 focus:ring-offset-bg',
-                )}
-              />
-              <button
-                type="submit"
-                disabled={!input.trim() || loading}
-                aria-label="Send"
-                className={cn(
-                  'grid size-11 shrink-0 place-items-center rounded-lg bg-accent text-accent-fg',
-                  'transition-transform active:scale-95 touch-manipulation',
-                  'disabled:opacity-50 disabled:pointer-events-none',
-                )}
-              >
-                <Send className="size-4" />
-              </button>
-            </form>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void send();
+                  }}
+                  className="flex items-center gap-2 border-t border-border p-3"
+                >
+                  <input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="What do you recommend?"
+                    aria-label="Message the waiter"
+                    className={cn(
+                      'h-11 flex-1 rounded-lg border border-border bg-bg px-3.5 text-base',
+                      'placeholder:text-muted focus:border-fg focus:outline-none focus:ring-2 focus:ring-fg focus:ring-offset-2 focus:ring-offset-bg',
+                    )}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!input.trim() || loading}
+                    aria-label="Send"
+                    className={cn(
+                      'grid size-11 shrink-0 place-items-center rounded-lg bg-accent text-accent-fg',
+                      'transition-transform active:scale-95 touch-manipulation',
+                      'disabled:opacity-50 disabled:pointer-events-none',
+                    )}
+                  >
+                    <Send className="size-4" />
+                  </button>
+                </form>
               </>
             )}
           </div>
@@ -431,9 +432,7 @@ function OrdersView({
   return (
     <div className="flex-1 space-y-3 overflow-y-auto p-4">
       {orders.length === 0 ? (
-        <p className="py-10 text-center text-sm text-muted">
-          You haven&apos;t ordered yet.
-        </p>
+        <p className="py-10 text-center text-sm text-muted">You haven&apos;t ordered yet.</p>
       ) : (
         orders.map((o) => {
           const live = liveById[o.id];
@@ -441,21 +440,11 @@ function OrdersView({
           const paid = (live?.paymentStatus ?? o.paymentStatus) === 'paid';
           const sv = STATUS_VIEW[status];
           return (
-            <div
-              key={o.id}
-              className="rounded-xl border border-border bg-subtle/40 p-3"
-            >
+            <div key={o.id} className="rounded-xl border border-border bg-subtle/40 p-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-mono text-sm font-semibold">
-                  {o.orderNumber}
-                </span>
+                <span className="font-mono text-sm font-semibold">{o.orderNumber}</span>
                 <div className="flex items-center gap-1.5">
-                  <span
-                    className={cn(
-                      'rounded-full px-2 py-0.5 text-[11px] font-medium',
-                      sv.cls,
-                    )}
-                  >
+                  <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', sv.cls)}>
                     {sv.label}
                   </span>
                   {paid && (

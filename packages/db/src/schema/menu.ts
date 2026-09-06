@@ -43,6 +43,13 @@ export const menuItems = pgTable(
     name: text().notNull(),
     description: text(),
     basePricePaise: integer().notNull(),
+    /** HSN/SAC code used for GST filing (GSTR-1). Null = not yet classified. */
+    hsnCode: text(),
+    /**
+     * Per-item GST rate in basis points (e.g. 1800 = 18%). When set, overrides
+     * the cafe-level gstMode for this item. Null = use the cafe default.
+     */
+    gstRateBpOverride: integer(),
     imageUrl: text(),
     isVegetarian: boolean().notNull().default(true),
     isVegan: boolean().notNull().default(false),

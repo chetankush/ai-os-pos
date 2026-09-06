@@ -10,12 +10,12 @@ import type {
 } from '@sangam/types';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildTestApp } from '../../test/helpers.js';
 import type { AgentResult } from '../ai/agent.js';
 import type { AiConsoleMessagesRepository } from '../repositories/ai-console-messages.js';
 import type { CafesRepository } from '../repositories/cafes.js';
 import type { MenuRepository } from '../repositories/menu.js';
 import type { OrdersRepository } from '../repositories/orders.js';
-import { buildTestApp } from '../../test/helpers.js';
 import { aiConsoleRoutes } from './ai-console.js';
 
 const JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
@@ -56,6 +56,8 @@ function makeMenuItem(overrides: Partial<MenuItem> = {}): MenuItem {
     name: 'Samosa',
     description: null,
     basePricePaise: 3000,
+    hsnCode: null,
+    gstRateBpOverride: null,
     imageUrl: null,
     isVegetarian: true,
     isVegan: false,

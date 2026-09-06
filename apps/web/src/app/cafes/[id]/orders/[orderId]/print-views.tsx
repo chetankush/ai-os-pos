@@ -1,9 +1,9 @@
 'use client';
 
-import type { Cafe, OrderItem, OrderPayment, OrderWithItems } from '@sangam/types';
-import { useState } from 'react';
-import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import type { Cafe, OrderItem, OrderPayment, OrderWithItems } from '@sangam/types';
+import { Printer } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 type Mode = 'kot' | 'bill' | null;
 
@@ -29,6 +29,37 @@ export function PrintViews({ order, cafe, payments = [] }: PrintViewsProps) {
     setTimeout(() => window.print(), 50);
   }
 
+  // Auto-print when the order detail is opened via ?autoprint=kot|bill — used
+  // by the counter order-builder to fire-and-forget a kitchen ticket in a new
+  // tab the instant an order is placed. The tab closes itself after print so
+  // the cashier isn't left with a graveyard of open order tabs.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const auto = params.get('autoprint');
+    if (auto !== 'kot' && auto !== 'bill') return;
+
+    setMode(auto);
+    const closeAfter = () => {
+      // Best-effort: window.close() only works for tabs opened via window.open().
+      try {
+        window.close();
+      } catch {
+        // ignore — user can close the tab themselves
+      }
+    };
+    window.addEventListener('afterprint', closeAfter, { once: true });
+    // Double-RAF + 100ms gives React time to hydrate and paint the slip
+    // before the print dialog snapshots it (early prints come out blank).
+    const t = window.setTimeout(() => {
+      requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+    }, 100);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener('afterprint', closeAfter);
+    };
+  }, []);
+
   return (
     <>
       <div className="flex flex-wrap items-center gap-2 print:hidden">
@@ -42,8 +73,15 @@ export function PrintViews({ order, cafe, payments = [] }: PrintViewsProps) {
         </Button>
       </div>
 
-      {/* Keep the page background white while printing. */}
-      <style>{`@media print { body { background: #fff; } }`}</style>
+      {/* Thermal-printer page sizing: 80mm wide, auto height, zero margins so
+          the printer doesn't feed extra paper around the slip. Background
+          stays white during print. Screen layout unaffected. */}
+      <style>{`
+        @page { size: 80mm auto; margin: 0; }
+        @media print {
+          html, body { margin: 0; background: #fff; }
+        }
+      `}</style>
 
       {/*
         Print-only container. Hidden on screen; during print it covers the whole
@@ -61,9 +99,7 @@ export function PrintViews({ order, cafe, payments = [] }: PrintViewsProps) {
 // ─── KOT (kitchen ticket) — NO prices ───────────────────────────────────────
 
 function Kot({ order }: { order: OrderWithItems }) {
-  const tableLine = order.tableLabel
-    ? `Table ${order.tableLabel}`
-    : 'Walk-in';
+  const tableLine = order.tableLabel ? `Table ${order.tableLabel}` : 'Walk-in';
 
   return (
     <div className="mx-auto w-[80mm] max-w-[80mm] bg-white p-2 font-mono text-[12px] leading-tight text-black">
@@ -85,9 +121,7 @@ function Kot({ order }: { order: OrderWithItems }) {
             <p className="text-base font-bold">
               {item.quantity} × {item.itemNameSnapshot}
             </p>
-            {item.notes && (
-              <p className="pl-3 text-[11px]">↳ {item.notes}</p>
-            )}
+            {item.notes && <p className="pl-3 text-[11px]">↳ {item.notes}</p>}
           </li>
         ))}
       </ul>
@@ -126,7 +160,7 @@ function Bill({
   ].filter(Boolean);
 
   const paymentLabel = order.paymentMethod
-    ? PAYMENT_LABELS[order.paymentMethod] ?? order.paymentMethod
+    ? (PAYMENT_LABELS[order.paymentMethod] ?? order.paymentMethod)
     : null;
 
   return (
@@ -220,9 +254,7 @@ function Bill({
 
       <div className="mt-1 flex items-baseline justify-between border-t-2 border-black pt-1">
         <span className="text-sm font-bold">Total</span>
-        <span className="text-base font-bold">
-          {formatRupees(order.totalPaise)}
-        </span>
+        <span className="text-base font-bold">{formatRupees(order.totalPaise)}</span>
       </div>
 
       {payments.length > 0 ? (
@@ -251,12 +283,8 @@ function BillItemRow({ item }: { item: OrderItem }) {
     <tr className="align-top">
       <td className="py-0.5 pr-1">{item.itemNameSnapshot}</td>
       <td className="py-0.5 text-center tabular-nums">{item.quantity}</td>
-      <td className="py-0.5 text-right tabular-nums">
-        {formatRupees(item.unitPricePaise)}
-      </td>
-      <td className="py-0.5 text-right tabular-nums">
-        {formatRupees(item.lineTotalPaise)}
-      </td>
+      <td className="py-0.5 text-right tabular-nums">{formatRupees(item.unitPricePaise)}</td>
+      <td className="py-0.5 text-right tabular-nums">{formatRupees(item.lineTotalPaise)}</td>
     </tr>
   );
 }

@@ -1,15 +1,9 @@
-import Link from 'next/link';
-import {
-  Check,
-  Sparkles,
-  TrendingDown,
-  ShieldCheck,
-  X,
-} from 'lucide-react';
 import { buttonClasses } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/card';
 import { FadeIn } from '@/components/ui/motion';
 import { cn } from '@/lib/cn';
+import { Check, ShieldCheck, Sparkles, TrendingDown, X } from 'lucide-react';
+import Link from 'next/link';
 
 export const metadata = {
   title: 'Pricing · Sangam',
@@ -40,7 +34,7 @@ const TIERS: Tier[] = [
       'Unlimited orders',
       '0% commission',
     ],
-    cta: 'Book a call',
+    cta: 'Get started',
     variant: 'secondary',
   },
   {
@@ -54,7 +48,7 @@ const TIERS: Tier[] = [
       'Priority support',
       'Advanced analytics',
     ],
-    cta: 'Book a call',
+    cta: 'Get started',
     variant: 'primary',
     popular: true,
   },
@@ -101,22 +95,15 @@ export default function PricingPage() {
             Pay less for your POS.
           </h1>
           <p className="mx-auto mt-5 max-w-prose text-pretty text-base leading-relaxed text-muted sm:text-lg">
-            Legacy POS and delivery aggregators bleed restaurants with fat monthly fees
-            and 18–30% commissions. Sangam is one flat, honest price —{' '}
-            <span className="font-medium text-fg">0% commission</span>, everything
-            included.
+            Legacy POS and delivery aggregators bleed restaurants with fat monthly fees and 18–30%
+            commissions. Sangam is one flat, honest price —{' '}
+            <span className="font-medium text-fg">0% commission</span>, everything included.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <a
-              href="mailto:chetankushwah929@gmail.com"
-              className={buttonClasses({ variant: 'primary', size: 'lg' })}
-            >
-              Book a call
-            </a>
-            <Link
-              href="#plans"
-              className={buttonClasses({ variant: 'secondary', size: 'lg' })}
-            >
+            <Link href="/signup" className={buttonClasses({ variant: 'primary', size: 'lg' })}>
+              Get started
+            </Link>
+            <Link href="#plans" className={buttonClasses({ variant: 'secondary', size: 'lg' })}>
               See features
             </Link>
           </div>
@@ -131,24 +118,17 @@ export default function PricingPage() {
         <FadeIn>
           <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2">
             <div className="flex items-start gap-3 bg-bg p-5 sm:p-6">
-              <X
-                className="mt-0.5 size-5 shrink-0 text-danger"
-                aria-hidden="true"
-              />
+              <X className="mt-0.5 size-5 shrink-0 text-danger" aria-hidden="true" />
               <p className="text-sm leading-relaxed text-muted">
-                <span className="font-medium text-fg">Others:</span>{' '}
-                18–30% aggregator commission plus per-feature add-ons that stack
-                up every month.
+                <span className="font-medium text-fg">Others:</span> 18–30% aggregator commission
+                plus per-feature add-ons that stack up every month.
               </p>
             </div>
             <div className="flex items-start gap-3 bg-bg p-5 sm:p-6">
-              <Check
-                className="mt-0.5 size-5 shrink-0 text-accent"
-                aria-hidden="true"
-              />
+              <Check className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
               <p className="text-sm leading-relaxed text-fg">
-                <span className="font-medium">Sangam:</span> one flat price,
-                0% commission, unlimited orders.
+                <span className="font-medium">Sangam:</span> one flat price, 0% commission,
+                unlimited orders.
               </p>
             </div>
           </div>
@@ -156,17 +136,14 @@ export default function PricingPage() {
       </section>
 
       {/* Pricing cards */}
-      <section
-        id="plans"
-        className="mx-auto max-w-6xl scroll-mt-24 px-5 py-16 sm:px-8 sm:py-20"
-      >
+      <section id="plans" className="mx-auto max-w-6xl scroll-mt-24 px-5 py-16 sm:px-8 sm:py-20">
         <FadeIn className="mx-auto max-w-2xl text-center">
           <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
             Simple plans, no surprises
           </h2>
           <p className="mx-auto mt-4 max-w-prose text-pretty text-base leading-relaxed text-muted">
-            Pick the plan that fits your kitchen today. Upgrade or cancel anytime
-            — billing is monthly.
+            Pick the plan that fits your kitchen today. Upgrade or cancel anytime — billing is
+            monthly.
           </p>
         </FadeIn>
 
@@ -176,8 +153,7 @@ export default function PricingPage() {
               <Card
                 className={cn(
                   'relative flex h-full flex-col',
-                  tier.popular &&
-                    'border-accent ring-1 ring-accent shadow-md shadow-black/[0.06]',
+                  tier.popular && 'border-accent ring-1 ring-accent shadow-md shadow-black/[0.06]',
                 )}
               >
                 {tier.popular ? (
@@ -188,9 +164,7 @@ export default function PricingPage() {
                 ) : null}
                 <CardBody className="flex flex-1 flex-col gap-6 p-6 pt-6 sm:p-8 sm:pt-8">
                   <div>
-                    <h3 className="text-lg font-semibold tracking-tight">
-                      {tier.name}
-                    </h3>
+                    <h3 className="text-lg font-semibold tracking-tight">{tier.name}</h3>
                     <p className="mt-1 text-sm text-muted">{tier.who}</p>
                   </div>
 
@@ -205,19 +179,14 @@ export default function PricingPage() {
                   <ul className="flex flex-1 flex-col gap-3">
                     {tier.features.map((feature) => (
                       <li key={feature} className="flex items-start gap-2.5">
-                        <Check
-                          className="mt-0.5 size-4 shrink-0 text-accent"
-                          aria-hidden="true"
-                        />
-                        <span className="text-sm leading-relaxed text-fg">
-                          {feature}
-                        </span>
+                        <Check className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
+                        <span className="text-sm leading-relaxed text-fg">{feature}</span>
                       </li>
                     ))}
                   </ul>
 
-                  <a
-                    href="mailto:chetankushwah929@gmail.com"
+                  <Link
+                    href="/signup"
                     className={buttonClasses({
                       variant: tier.variant,
                       size: 'lg',
@@ -225,7 +194,7 @@ export default function PricingPage() {
                     })}
                   >
                     {tier.cta}
-                  </a>
+                  </Link>
                 </CardBody>
               </Card>
             </FadeIn>
@@ -246,9 +215,9 @@ export default function PricingPage() {
                 It pays for itself
               </h2>
               <p className="mx-auto mt-4 max-w-prose text-pretty text-base leading-relaxed text-muted">
-                A flat fee plus Settle clawing back what aggregators overcharge
-                means you pay less <span className="font-medium text-fg">net</span>{' '}
-                — often the subscription disappears entirely.
+                A flat fee plus Settle clawing back what aggregators overcharge means you pay less{' '}
+                <span className="font-medium text-fg">net</span> — often the subscription disappears
+                entirely.
               </p>
             </div>
 
@@ -283,9 +252,7 @@ export default function PricingPage() {
             {FAQS.map((faq) => (
               <div key={faq.q} className="py-5">
                 <dt className="text-base font-medium text-fg">{faq.q}</dt>
-                <dd className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
-                  {faq.a}
-                </dd>
+                <dd className="mt-2 max-w-prose text-sm leading-relaxed text-muted">{faq.a}</dd>
               </div>
             ))}
           </dl>
@@ -300,16 +267,12 @@ export default function PricingPage() {
               Start taking orders today
             </h2>
             <p className="mx-auto mt-4 max-w-prose text-pretty text-base leading-relaxed text-muted">
-              One flat price, 0% commission, set up in minutes. Your data stays
-              yours.
+              One flat price, 0% commission, set up in minutes. Your data stays yours.
             </p>
             <div className="mt-8 flex justify-center">
-              <a
-                href="mailto:chetankushwah929@gmail.com"
-                className={buttonClasses({ variant: 'primary', size: 'lg' })}
-              >
-                Book a call
-              </a>
+              <Link href="/signup" className={buttonClasses({ variant: 'primary', size: 'lg' })}>
+                Get started
+              </Link>
             </div>
           </div>
         </FadeIn>
@@ -332,9 +295,7 @@ function Payoff({
       <span className="inline-flex size-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
         {icon}
       </span>
-      <h3 className="mt-3 text-sm font-semibold tracking-tight text-fg">
-        {title}
-      </h3>
+      <h3 className="mt-3 text-sm font-semibold tracking-tight text-fg">{title}</h3>
       <p className="mt-1.5 text-sm leading-relaxed text-muted">{body}</p>
     </div>
   );

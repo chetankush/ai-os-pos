@@ -1,7 +1,7 @@
-import Link from 'next/link';
 import { TriquetraMark } from '@/components/ui/logo';
 import { FadeIn } from '@/components/ui/motion';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import Link from 'next/link';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -24,20 +24,21 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       </main>
 
       {/* Right: marketing aside, hidden on mobile */}
-      <aside className="hidden lg:flex flex-col justify-between border-l border-border bg-subtle/40 p-12">
+      <aside className="hidden lg:flex flex-col justify-between border-l border-border bg-subtle/40 p-12 font-display">
         <FadeIn delay={0.1}>
-          <p className="text-sm uppercase tracking-[0.18em] text-muted">
-            Sangam
-          </p>
+          <div className="inline-flex items-center gap-2">
+            <TriquetraMark className="size-5 shrink-0 text-accent" />
+            <span className="text-sm font-semibold tracking-tight">Sangam</span>
+          </div>
         </FadeIn>
         <FadeIn delay={0.15}>
           <div className="space-y-4 max-w-md">
-            <h2 className="text-3xl font-semibold tracking-tight leading-tight">
+            <h2 className="text-3xl font-semibold tracking-tight leading-tight text-balance">
               The POS your restaurant &amp; cafe deserves.
             </h2>
-            <p className="text-sm text-muted leading-relaxed">
-              Built for Indian restaurants and cafes. Flat pricing, no
-              commissions. AI waiter that lifts average order value by 15%.
+            <p className="text-sm text-muted leading-relaxed text-pretty">
+              Built for Indian restaurants and cafes. Flat pricing, no commissions. An AI waiter
+              that lifts average order value.
             </p>
           </div>
         </FadeIn>
