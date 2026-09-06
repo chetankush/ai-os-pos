@@ -15,6 +15,7 @@ import { buildBillNumber, financialYear } from '../orders/build.js';
 export interface NewOrderItem {
   menuItemId: string | null;
   itemNameSnapshot: string;
+  hsnSnapshot: string | null;
   unitPricePaise: number;
   quantity: number;
   notes: string | null;
@@ -27,6 +28,7 @@ export interface NewOrder {
   tableSessionId: string | null;
   customerName: string | null;
   customerPhone: string | null;
+  customerGstin: string | null;
   notes: string | null;
   subtotalPaise: number;
   discountPaise: number;
@@ -51,6 +53,11 @@ export interface OrdersRepository {
    */
   listKitchenTickets(cafeId: string): Promise<OrderWithItems[]>;
   findByIdAndCafe(id: string, cafeId: string): Promise<OrderWithItems | null>;
+  /**
+   * Records that the customer bill was printed and returns the new count.
+   * The first print is the original; anything above 1 is stamped DUPLICATE.
+   */
+  markBillPrinted(id: string, cafeId: string): Promise<number | null>;
   updateStatus(
     id: string,
     cafeId: string,
@@ -127,6 +134,7 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
             tableSessionId: data.tableSessionId,
             customerName: data.customerName,
             customerPhone: data.customerPhone,
+            customerGstin: data.customerGstin,
             notes: data.notes,
             subtotalPaise: data.subtotalPaise,
             discountPaise: data.discountPaise,
@@ -151,6 +159,7 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
                 orderId: orderRow.id,
                 menuItemId: it.menuItemId,
                 itemNameSnapshot: it.itemNameSnapshot,
+                hsnSnapshot: it.hsnSnapshot,
                 unitPricePaise: it.unitPricePaise,
                 quantity: it.quantity,
                 lineTotalPaise: it.unitPricePaise * it.quantity,
@@ -246,6 +255,17 @@ export function createDrizzleOrdersRepo(db: Database): OrdersRepository {
       return { ...orderRow, items };
     },
 
+
+    async markBillPrinted(id, cafeId) {
+      // Increment in SQL, not read-then-write: two terminals printing the same
+      // bill at once must produce 1 and 2, never 1 and 1.
+      const [row] = await db
+        .update(schema.orders)
+        .set({ billPrintCount: sql`${schema.orders.billPrintCount} + 1` })
+        .where(and(eq(schema.orders.id, id), eq(schema.orders.cafeId, cafeId)))
+        .returning({ billPrintCount: schema.orders.billPrintCount });
+      return row?.billPrintCount ?? null;
+    },
     async updateStatus(id, cafeId, status, paymentMethod) {
       const patch: {
         status: OrderStatus;

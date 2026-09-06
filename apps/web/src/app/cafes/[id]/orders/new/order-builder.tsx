@@ -96,10 +96,23 @@ function isNetworkError(err: unknown): boolean {
   return err instanceof NetworkError;
 }
 
+/**
+ * Shows the exact payable amount, paise included.
+ *
+ * This used to round to whole rupees for display, so a ₹241.50 order showed
+ * "Place order · ₹242" at the counter while the printed bill said ₹241.50.
+ * The cashier collected one number and the customer's invoice showed another,
+ * and the 50 paise gap turned up later as cash-drawer variance. If a cafe wants
+ * whole rupees it should switch on round-off, which adjusts the real total and
+ * prints an explicit "Round off" line — not have the screen quietly disagree
+ * with the paper.
+ */
 function formatRupees(paise: number): string {
-  return `₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(
-    Math.round(paise / 100),
-  )}`;
+  const rupees = paise / 100;
+  return `₹${rupees.toLocaleString('en-IN', {
+    minimumFractionDigits: Number.isInteger(rupees) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 interface BillBreakdown {

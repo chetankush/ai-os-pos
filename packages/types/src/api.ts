@@ -187,6 +187,8 @@ export interface CreateOrderRequest {
   tableSessionId?: string;
   customerName?: string;
   customerPhone?: string;
+  /** 15-char GSTIN for a B2B diner who needs input tax credit. */
+  customerGstin?: string;
   notes?: string;
   items: Array<{
     menuItemId: string;

@@ -85,6 +85,13 @@
       "when": 1780125061694,
       "tag": "0011_medical_warbound",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788717807974,
+      "tag": "0012_elite_nuke",
+      "breakpoints": true
     }
   ]
 }

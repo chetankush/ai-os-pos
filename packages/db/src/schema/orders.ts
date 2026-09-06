@@ -51,6 +51,9 @@ export const orders = pgTable(
     tableSessionId: uuid(),
     customerName: text(),
     customerPhone: text(),
+    // B2B diners (corporate meals) need their GSTIN on the invoice to claim
+    // input tax credit. Null for the ordinary walk-in.
+    customerGstin: text(),
     notes: text(),
 
     // Money in paise (integer) for exactness. Indian POS convention.
@@ -68,6 +71,11 @@ export const orders = pgTable(
     // GST rate stored in basis points (500 = 5.00%, 1800 = 18.00%) so we
     // never lose precision if rates change in future.
     gstRateBp: integer().notNull().default(500),
+
+    // How many times the customer bill has been printed. The first print is
+    // the original; every later one is stamped DUPLICATE, so a reprinted bill
+    // can never be passed off as the original during a cash audit.
+    billPrintCount: integer().notNull().default(0),
 
     // How the bill was settled — recorded when the order is completed.
     paymentMethod: text({ enum: paymentMethodValues }),
@@ -106,6 +114,9 @@ export const orderItems = pgTable(
 
     // Snapshot fields — fixed at order time so menu edits don't change history.
     itemNameSnapshot: text().notNull(),
+    // HSN/SAC frozen at order time too — a later menu correction must not
+    // rewrite the code printed on an invoice already given to a customer.
+    hsnSnapshot: text(),
     unitPricePaise: integer().notNull(),
     quantity: integer().notNull(),
     lineTotalPaise: integer().notNull(),

@@ -1,6 +1,8 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { amountInWords, billDocumentTitle, compositionDeclaration } from '@/lib/bill-document';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { Cafe, OrderItem, OrderPayment, OrderWithItems } from '@sangam/types';
 import { Printer } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -20,10 +22,50 @@ const PAYMENT_LABELS: Record<string, string> = {
   online: 'Online',
 };
 
+/**
+ * Tells the API a customer bill is about to be printed and reports whether this
+ * copy is a reprint. Called before rendering so the slip can be stamped
+ * DUPLICATE — an unmarked second copy of a bill is a cash-skimming vector.
+ */
+async function markBillPrinted(
+  cafeId: string,
+  orderId: string,
+): Promise<{ printCount: number; isDuplicate: boolean }> {
+  const supabase = createSupabaseBrowserClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}`.replace(/\/+$/, '') +
+      `/cafes/${cafeId}/orders/${orderId}/bill-printed`,
+    {
+      method: 'POST',
+      headers: session ? { authorization: `Bearer ${session.access_token}` } : {},
+    },
+  );
+  if (!res.ok) throw new Error(`Failed to record bill print (${res.status})`);
+  return (await res.json()) as { printCount: number; isDuplicate: boolean };
+}
+
 export function PrintViews({ order, cafe, payments = [] }: PrintViewsProps) {
   const [mode, setMode] = useState<Mode>(null);
+  // A bill that has been printed before must say so on the paper. Seeded from
+  // the order so a page reload still knows, then refreshed from the server on
+  // each print so two terminals can't both believe they hold the original.
+  const [isDuplicate, setIsDuplicate] = useState(order.billPrintCount > 0);
 
-  function print(next: Exclude<Mode, null>) {
+  async function print(next: Exclude<Mode, null>) {
+    // The KOT is a kitchen slip, not a financial document — it isn't counted.
+    if (next === 'bill') {
+      try {
+        const res = await markBillPrinted(order.cafeId, order.id);
+        setIsDuplicate(res.isDuplicate);
+      } catch {
+        // Never block the cashier on a bookkeeping call. Fall back to what the
+        // loaded order knew; worst case a reprint is unstamped, not unprinted.
+      }
+    }
     setMode(next);
     // Let React paint the selected ticket before opening the print dialog.
     setTimeout(() => window.print(), 50);
@@ -39,6 +81,11 @@ export function PrintViews({ order, cafe, payments = [] }: PrintViewsProps) {
     const auto = params.get('autoprint');
     if (auto !== 'kot' && auto !== 'bill') return;
 
+    if (auto === 'bill') {
+      void markBillPrinted(order.cafeId, order.id)
+        .then((res) => setIsDuplicate(res.isDuplicate))
+        .catch(() => undefined);
+    }
     setMode(auto);
     const closeAfter = () => {
       // Best-effort: window.close() only works for tabs opened via window.open().
@@ -58,7 +105,7 @@ export function PrintViews({ order, cafe, payments = [] }: PrintViewsProps) {
       window.clearTimeout(t);
       window.removeEventListener('afterprint', closeAfter);
     };
-  }, []);
+  }, [order.cafeId, order.id]);
 
   return (
     <>
@@ -90,7 +137,9 @@ export function PrintViews({ order, cafe, payments = [] }: PrintViewsProps) {
       */}
       <div className="fixed inset-0 z-[999] hidden bg-white text-black print:block">
         {mode === 'kot' && <Kot order={order} />}
-        {mode === 'bill' && <Bill order={order} cafe={cafe} payments={payments} />}
+        {mode === 'bill' && (
+          <Bill order={order} cafe={cafe} payments={payments} isDuplicate={isDuplicate} />
+        )}
       </div>
     </>
   );
@@ -143,11 +192,19 @@ function Bill({
   order,
   cafe,
   payments,
+  isDuplicate,
 }: {
   order: OrderWithItems;
   cafe: Cafe;
   payments: OrderPayment[];
+  isDuplicate: boolean;
 }) {
+  // A composition dealer or exempt supplier may not head a document "Tax
+  // Invoice" — it has to be a Bill of Supply. See lib/bill-document.
+  const documentTitle = billDocumentTitle(cafe.gstMode);
+  const declaration = compositionDeclaration(cafe.gstMode);
+  // Only widen the item table with an HSN column if some item actually has one.
+  const showHsn = order.items.some((it) => it.hsnSnapshot);
   // Split GST in half (intra-state convention) so CGST + SGST === taxPaise.
   const cgstPaise = Math.floor(order.taxPaise / 2);
   const sgstPaise = order.taxPaise - cgstPaise;
@@ -178,7 +235,10 @@ function Bill({
 
       <Divider />
 
-      <p className="text-center font-bold">TAX INVOICE</p>
+      <p className="text-center font-bold">{documentTitle}</p>
+      {isDuplicate && (
+        <p className="text-center text-sm font-bold tracking-widest">*** DUPLICATE ***</p>
+      )}
       <div className="flex justify-between">
         <span>Bill:</span>
         <span className="font-bold">{order.orderNumber}</span>
@@ -205,6 +265,12 @@ function Bill({
           <span>{order.customerPhone}</span>
         </div>
       )}
+      {order.customerGstin && (
+        <div className="flex justify-between">
+          <span>Customer GSTIN:</span>
+          <span>{order.customerGstin}</span>
+        </div>
+      )}
 
       <Divider />
 
@@ -212,6 +278,7 @@ function Bill({
         <thead>
           <tr className="border-b border-dashed border-black text-left">
             <th className="py-0.5 font-bold">Item</th>
+            {showHsn && <th className="py-0.5 text-left font-bold">HSN</th>}
             <th className="py-0.5 text-center font-bold">Qty</th>
             <th className="py-0.5 text-right font-bold">Rate</th>
             <th className="py-0.5 text-right font-bold">Amt</th>
@@ -219,7 +286,7 @@ function Bill({
         </thead>
         <tbody>
           {order.items.map((item) => (
-            <BillItemRow key={item.id} item={item} />
+            <BillItemRow key={item.id} item={item} showHsn={showHsn} />
           ))}
         </tbody>
       </table>
@@ -257,6 +324,8 @@ function Bill({
         <span className="text-base font-bold">{formatRupees(order.totalPaise)}</span>
       </div>
 
+      <p className="mt-1 text-[11px]">{amountInWords(order.totalPaise)}</p>
+
       {payments.length > 0 ? (
         <div className="mt-1">
           {payments.map((p) => (
@@ -273,15 +342,18 @@ function Bill({
 
       <Divider />
 
+      {declaration && <p className="text-center text-[11px] font-bold">{declaration}</p>}
+
       <p className="text-center">Thank you! Visit again</p>
     </div>
   );
 }
 
-function BillItemRow({ item }: { item: OrderItem }) {
+function BillItemRow({ item, showHsn }: { item: OrderItem; showHsn: boolean }) {
   return (
     <tr className="align-top">
       <td className="py-0.5 pr-1">{item.itemNameSnapshot}</td>
+      {showHsn && <td className="py-0.5 pr-1 tabular-nums">{item.hsnSnapshot ?? '—'}</td>}
       <td className="py-0.5 text-center tabular-nums">{item.quantity}</td>
       <td className="py-0.5 text-right tabular-nums">{formatRupees(item.unitPricePaise)}</td>
       <td className="py-0.5 text-right tabular-nums">{formatRupees(item.lineTotalPaise)}</td>

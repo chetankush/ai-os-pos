@@ -85,6 +85,7 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
     tableSessionId: null,
     customerName: null,
     customerPhone: null,
+    customerGstin: null,
     notes: null,
     subtotalPaise: 30000,
     discountPaise: 0,
@@ -95,6 +96,7 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
     roundOffPaise: 0,
     totalPaise: 31500,
     gstRateBp: 500,
+    billPrintCount: 0,
     paymentMethod: null,
     paymentStatus: 'unpaid',
     providerOrderId: null,
@@ -112,6 +114,7 @@ function makeOrderWithItems(overrides: Partial<OrderWithItems> = {}): OrderWithI
     orderId: ORDER_ID,
     menuItemId: ITEM_ID,
     itemNameSnapshot: 'Cappuccino',
+    hsnSnapshot: null,
     unitPricePaise: 15000,
     quantity: 2,
     lineTotalPaise: 30000,
@@ -131,6 +134,7 @@ function createMockOrdersRepo() {
     listBySession: vi.fn<(sessionId: string, cafeId: string) => Promise<OrderWithItems[]>>(),
     listKitchenTickets: vi.fn<(cafeId: string) => Promise<OrderWithItems[]>>(),
     findByIdAndCafe: vi.fn<(id: string, cafeId: string) => Promise<OrderWithItems | null>>(),
+    markBillPrinted: vi.fn<(id: string, cafeId: string) => Promise<number | null>>(),
     updateStatus:
       vi.fn<(id: string, cafeId: string, status: OrderStatus) => Promise<Order | null>>(),
     todayStats: vi.fn<(cafeId: string) => Promise<OrderStatsResponse>>(),
@@ -240,6 +244,7 @@ describe('orders endpoints', () => {
     ordersRepo.listByCafe.mockReset();
     ordersRepo.listKitchenTickets.mockReset();
     ordersRepo.findByIdAndCafe.mockReset();
+    ordersRepo.markBillPrinted.mockReset();
     ordersRepo.updateStatus.mockReset();
     ordersRepo.todayStats.mockReset();
     ordersRepo.settleWithPayments.mockReset();
@@ -755,6 +760,83 @@ describe('orders endpoints', () => {
       expect(res.statusCode).toBe(200);
       expect(res.json().payments).toHaveLength(1);
       expect(res.json().payments[0].method).toBe('cash');
+    });
+  });
+
+  describe('POST /cafes/:cafeId/orders/:orderId/bill-printed', () => {
+    it('reports the first print as the original, not a duplicate', async () => {
+      ordersRepo.findByIdAndCafe.mockResolvedValueOnce(makeOrderWithItems());
+      ordersRepo.markBillPrinted.mockResolvedValueOnce(1);
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/bill-printed`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ printCount: 1, isDuplicate: false });
+    });
+
+    it('flags every reprint as a duplicate', async () => {
+      ordersRepo.findByIdAndCafe.mockResolvedValueOnce(makeOrderWithItems());
+      ordersRepo.markBillPrinted.mockResolvedValueOnce(2);
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/bill-printed`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+      });
+
+      expect(res.json()).toEqual({ printCount: 2, isDuplicate: true });
+    });
+
+    // Reprints are a cash-skimming vector, so they must leave a trail.
+    it('writes an audit entry for a reprint but not for the original', async () => {
+      ordersRepo.findByIdAndCafe.mockResolvedValueOnce(makeOrderWithItems());
+      ordersRepo.markBillPrinted.mockResolvedValueOnce(1);
+      await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/bill-printed`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+      });
+      expect(auditRepo.record).not.toHaveBeenCalled();
+
+      ordersRepo.findByIdAndCafe.mockResolvedValueOnce(makeOrderWithItems());
+      ordersRepo.markBillPrinted.mockResolvedValueOnce(3);
+      await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/bill-printed`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+      });
+
+      expect(auditRepo.record).toHaveBeenCalledTimes(1);
+      expect(auditRepo.record.mock.calls[0]?.[0]).toMatchObject({
+        action: 'order.bill_reprinted',
+        entityId: ORDER_ID,
+        metadata: { printCount: 3 },
+      });
+    });
+
+    it('404s for an order belonging to another cafe', async () => {
+      ordersRepo.findByIdAndCafe.mockResolvedValueOnce(null);
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/bill-printed`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(ordersRepo.markBillPrinted).not.toHaveBeenCalled();
+    });
+
+    it('requires authentication', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/cafes/${CAFE_ID}/orders/${ORDER_ID}/bill-printed`,
+      });
+      expect(res.statusCode).toBe(401);
     });
   });
 });

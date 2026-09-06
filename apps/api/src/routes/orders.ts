@@ -37,6 +37,13 @@ const createOrderBodySchema = z.object({
     .trim()
     .regex(/^\+?[0-9]{7,15}$/, 'phone must be 7-15 digits, optional + prefix')
     .optional(),
+  // B2B diners give their company GSTIN so the invoice supports input credit.
+  customerGstin: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/, 'Enter a valid 15-character GSTIN')
+    .optional(),
   notes: z.string().trim().max(500).optional(),
   items: z
     .array(
@@ -148,6 +155,7 @@ export async function ordersRoutes(
       tableSessionId: body.tableSessionId ?? null,
       customerName: body.customerName ?? null,
       customerPhone: body.customerPhone ?? null,
+      customerGstin: body.customerGstin ?? null,
       notes: body.notes ?? null,
       subtotalPaise: built.subtotalPaise,
       discountPaise: built.discountPaise,
@@ -286,6 +294,59 @@ export async function ordersRoutes(
 
       await cache.del(statsKey(cafeId));
       return { order: { ...updated, items: current.items } };
+    },
+  );
+
+  // ─── POST /cafes/:cafeId/orders/:orderId/bill-printed ───────────────────────
+
+  /**
+   * Records that the customer bill was printed and returns the resulting count.
+   * The counter calls this immediately BEFORE printing, so the slip it renders
+   * already knows whether it is the original (1) or a reprint (>1) and can be
+   * stamped DUPLICATE. Reprints are a cash-skimming vector — an unmarked second
+   * copy of a bill can be handed to a second table — so every print is recorded
+   * on the order and written to the immutable audit log.
+   */
+  app.post(
+    '/cafes/:cafeId/orders/:orderId/bill-printed',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { cafeId, orderId } = orderParamsSchema.parse(request.params);
+      if (!(await getOwnedCafe(cafeId, request.user.id))) {
+        return reply.status(404).send({
+          error: { code: 'NOT_FOUND', message: 'Cafe not found' },
+        });
+      }
+
+      const order = await ordersRepo.findByIdAndCafe(orderId, cafeId);
+      if (!order) {
+        return reply.status(404).send({
+          error: { code: 'NOT_FOUND', message: 'Order not found' },
+        });
+      }
+
+      const printCount = await ordersRepo.markBillPrinted(orderId, cafeId);
+      if (printCount === null) {
+        return reply.status(404).send({
+          error: { code: 'NOT_FOUND', message: 'Order not found' },
+        });
+      }
+
+      // Only reprints are worth an audit entry — the first print is routine.
+      if (printCount > 1) {
+        await auditRepo.record({
+          cafeId,
+          actorType: 'owner',
+          actorId: request.user.id,
+          action: 'order.bill_reprinted',
+          entityType: 'order',
+          entityId: orderId,
+          summary: `Reprinted bill for ${order.orderNumber} (copy ${printCount})`,
+          metadata: { printCount },
+        });
+      }
+
+      return { printCount, isDuplicate: printCount > 1 };
     },
   );
 

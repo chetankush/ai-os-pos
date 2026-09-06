@@ -137,13 +137,17 @@ export function buildOrder(
   lines: OrderLineInput[],
   adjustments: BillAdjustments = {},
 ): BuiltOrderTotals {
-  const byId = new Map<string, { name: string; price: number; available: boolean }>();
+  const byId = new Map<
+    string,
+    { name: string; price: number; available: boolean; hsn: string | null }
+  >();
   for (const cat of menu) {
     for (const item of cat.items) {
       byId.set(item.id, {
         name: item.name,
         price: item.basePricePaise,
         available: item.isAvailable,
+        hsn: item.hsnCode ?? null,
       });
     }
   }
@@ -159,6 +163,7 @@ export function buildOrder(
     return {
       menuItemId: line.menuItemId,
       itemNameSnapshot: snap.name,
+      hsnSnapshot: snap.hsn,
       unitPricePaise: snap.price,
       quantity: line.quantity,
       notes: line.notes ?? null,

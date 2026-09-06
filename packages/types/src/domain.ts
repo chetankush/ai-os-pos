@@ -119,6 +119,8 @@ export interface OrderItem {
   orderId: OrderId;
   menuItemId: string | null;
   itemNameSnapshot: string;
+  /** HSN/SAC frozen at order time; null when the menu item had none. */
+  hsnSnapshot: string | null;
   unitPricePaise: number;
   quantity: number;
   lineTotalPaise: number;
@@ -135,6 +137,8 @@ export interface Order {
   tableSessionId: string | null;
   customerName: string | null;
   customerPhone: string | null;
+  /** Set when a B2B diner needs the invoice in their company's GSTIN. */
+  customerGstin: string | null;
   notes: string | null;
   subtotalPaise: number;
   discountPaise: number;
@@ -145,6 +149,8 @@ export interface Order {
   roundOffPaise: number;
   totalPaise: number;
   gstRateBp: number;
+  /** Times the customer bill has been printed; >1 means reprints exist. */
+  billPrintCount: number;
   paymentMethod: PaymentMethod | null;
   paymentStatus: PaymentStatus;
   providerOrderId: string | null;

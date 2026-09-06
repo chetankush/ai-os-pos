@@ -128,6 +128,8 @@ export async function publicRoutes(
       tableSessionId: null,
       customerName: body.customerName ?? null,
       customerPhone: body.customerPhone ?? null,
+      // Diners order anonymously; a GSTIN is captured at the counter, not the QR.
+      customerGstin: null,
       notes: body.notes ?? null,
       subtotalPaise: built.subtotalPaise,
       discountPaise: built.discountPaise,
