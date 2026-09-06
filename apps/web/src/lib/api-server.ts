@@ -1,7 +1,8 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { ApiError } from './api';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+// Trailing slashes stripped for the same reason as in ./api — see the note there.
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
 
 async function getServerToken(): Promise<string | null> {
   const supabase = await createSupabaseServerClient();

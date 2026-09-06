@@ -6,7 +6,16 @@ import type {
   HealthResponse,
 } from '@sangam/types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+/**
+ * Base URL of the API, with any trailing slashes removed.
+ *
+ * Every call builds its URL as `${API_URL}${path}` and every `path` already
+ * starts with "/". A trailing slash in the env var therefore produces "//cafes",
+ * which Fastify treats as a different route and 404s — a deploy-only failure
+ * that looks like a generic "something went wrong" in a Server Component.
+ * Normalising here makes the env var forgiving.
+ */
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
 
 export class ApiError extends Error {
   constructor(

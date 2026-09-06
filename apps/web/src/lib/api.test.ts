@@ -282,3 +282,26 @@ describe('API client', () => {
     });
   });
 });
+
+describe('API base URL normalisation', () => {
+  // Regression: NEXT_PUBLIC_API_URL set with a trailing slash produced
+  // "//cafes", which Fastify 404s. It surfaced only in production as an
+  // opaque Server Components error. See the note in ./api.
+  it.each([
+    ['https://api.example.com/', 'https://api.example.com/cafes'],
+    ['https://api.example.com//', 'https://api.example.com/cafes'],
+    ['https://api.example.com', 'https://api.example.com/cafes'],
+  ])('%s builds %s', async (base, expected) => {
+    vi.resetModules();
+    vi.stubEnv('NEXT_PUBLIC_API_URL', base);
+
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ cafes: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const fresh = await import('./api');
+    await fresh.listCafes('token');
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(expected);
+    vi.unstubAllEnvs();
+  });
+});
