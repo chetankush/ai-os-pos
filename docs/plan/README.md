@@ -1,11 +1,12 @@
 # Sangam POS — remediation plan
 
-Three documents, produced from an end-to-end audit of the running product:
+Four documents, produced from an end-to-end audit of the running product:
 
 | Document | What it is |
 |---|---|
 | [user-stories.md](user-stories.md) | 8 core flows as user stories, decomposed into 98 acceptance criteria, each marked against the real code |
 | [gap-register.md](gap-register.md) | All 95 confirmed defects, with why each one hurts a cafe and where to fix it |
+| [capability-gaps.md](capability-gaps.md) | 128 capabilities a commercial Indian POS ships, assessed against Sangam — what was never started |
 | This file | The build order — 12 shippable milestones |
 
 ## How this was produced
@@ -26,7 +27,17 @@ An API with no UI reaching it does not count.
 
 The shape of the problem is not missing features — most screens exist and look finished.
 It is that several of them are wired to nothing, and a few compute money incorrectly
-while looking right. The three that cost real money today:
+while looking right.
+
+Four modules exist in the schema with **no production caller at all**, verified by call
+graph and not by grepping for names: `verifyPin()` (so staff PINs are stored and never
+checked), `inventoryRepo.decrementForOrder()` (stock never depletes on a sale),
+`customersRepo.upsertFromOrder()` (the CRM table stays empty — confirmed, 0 rows), and
+the `menuItemModifiers` / `menuModifierOptions` tables (no repository, route or UI above
+them). The product reads as more complete than it is, including to its own author — any
+estimate made from the schema rather than the call graph will be months short.
+
+The three defects that cost real money today:
 
 - **Per-item GST override is collected, validated and displayed — and never applied.** A cafe
   selling packaged goods at 18% charges 5% on every bill and under-reports GST.
@@ -38,6 +49,56 @@ while looking right. The three that cost real money today:
 **Total estimated effort: 187.5 engineer-days** (~8.9 months for one experienced developer).
 That is the honest number for all 95 gaps. The milestones are ordered so the product is
 sellable well before the end.
+
+---
+
+## Working from this plan
+
+Each work item is written to be picked up cold, without re-deriving the design. Across
+the 85 items:
+
+| | |
+|---|---|
+| Named test cases | 85 / 85 |
+| Files to touch listed | 84 / 85 |
+| API contract specified | 80 / 85 |
+| Exact schema columns given | 52 / 85 (the rest need no migration) |
+
+The median item is ~1,300 words of specification. `per-item-gst-engine`, for example,
+gives the largest-remainder apportionment algorithm in integer paise, the tie-break rule,
+the service-charge attribution rule, and a note that a mixed-rate bill can legitimately
+differ by one paisa from single-rate rounding — *"that is correct, not a bug"*.
+
+To execute one:
+
+1. Open the theme file, find the work item by its `id`.
+2. Write the named tests first — they are listed by name and file. They should fail.
+3. Implement against the stated approach, schema and API contract.
+4. Run `pnpm build && pnpm test && pnpm typecheck` at the repo root; all three must pass.
+5. Verify against the running app, not just the tests. The audit that produced this plan
+   found several features whose API worked and whose UI reached nothing — green tests
+   would not have caught those.
+
+House conventions the plans assume: failing test first; money as integer paise; route
+tests via `buildTestApp` + mocked repositories; repositories as interfaces injected into
+routes; additive drizzle-kit migrations; a foreign cafe returns 404, never 403; every
+sensitive action writes to the immutable audit log.
+
+### What this plan does not cover
+
+These documents audit the **correctness of what was built**. They are not a competitive
+feature list — an audit asking "is this flow wired end to end?" cannot see a capability
+that was never started.
+
+Those are tracked separately in [capability-gaps.md](capability-gaps.md): 128
+capabilities assessed against Petpooja/POSist/Rista, of which **108 are absent and 28 are
+legally mandatory in India**. Closing them all is ~1,219 engineer-days — roughly six times
+this remediation plan. That document tiers them, and explicitly marks ~198 days of work
+Sangam should **refuse to build**.
+
+Note the grain difference: work items here carry schema columns and named tests, and can
+be picked up cold. Capability gaps are scoped at what/why/how-many-days, and each needs
+its own design pass before it is implementable.
 
 ---
 
@@ -78,6 +139,23 @@ All 85 work items across the 11 themes are assigned exactly once, to 12 independ
 ### Deliberate merges
 
 three themes describe the same artefact from different angles, and building it three times is the main avoidable waste in this programme. (a) z-report-print (Theme C), z-report-settled-open-refunds (Theme E) and reports-range-and-z-print (Theme D) are ONE 80mm Z-report, built once in M4. (b) session-bill-reconciles (Theme B) and the "session totals that carry adjustments" half of one-thermal-bill (Theme K) are the same fix, done once in M1. (c) staff-actor-attribution (Theme C) overlaps staff-session-tokens (Theme A); both land in M3 so the PIN login is written once. Estimated saving from these merges is roughly 4–5 days, already reflected in the milestone totals.
+
+### Onboarding is hit before any of this
+
+The signup path itself works and is genuinely quick — email/password, auto-confirmed, no
+inbox round-trip, straight to the dashboard. What follows it does not:
+
+- A new owner's dashboard carries **no setup guidance at all**, and its only prompt points
+  at New order, which dead-ends on "No available items. Add items in the menu editor
+  first." as plain text with no link (`order-builder.tsx:554`).
+- There is **no password reset anywhere**, and signup auto-confirms the email so the
+  address is never proven. Mistype it and the outlet is locked out permanently.
+- `apps/api/.env.example` ships only `SUPABASE_JWT_SECRET` — it omits `SUPABASE_URL` and
+  `SUPABASE_SECRET_KEY`, so anyone following the repo's own template deploys a server
+  whose signup route silently never registers.
+
+These sit in M3 and M12 by dependency order, but they are the first thing a pilot cafe
+touches. Pull them forward.
 
 ### The pilot gate
 
