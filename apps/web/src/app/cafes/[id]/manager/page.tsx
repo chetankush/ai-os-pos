@@ -19,31 +19,25 @@ export default async function AiManagerPage({ params }: PageProps) {
     const cafeRes = await serverFetch<CafeResponse>(`/cafes/${id}`);
     const cafe = cafeRes.cafe;
 
+    // The conversation is the page here, so it takes the viewport rather than
+    // sitting in a fixed-height card below a tall masthead — a data-heavy answer
+    // (yesterday's sales, item breakdowns) was previously squeezed into 640px
+    // while the screen had room to spare.
+    //
+    // 7rem matches the sidebar's own height offset in cafe-shell, so the chat
+    // and the nav end on the same line; the mobile value adds the shell's
+    // mobile menu bar. min-h keeps it usable on a short laptop window.
     return (
-      <div className="space-y-8">
-        <div>
-          <Link
-            href={`/cafes/${id}`}
-            className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-fg transition-colors"
-          >
-            <ArrowLeft className="size-3" />
-            Back to {cafe.name}
-          </Link>
-          <div className="mt-3 space-y-1">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted">
-              AI Manager
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight">
-              {cafe.name}
-            </h1>
-            <p className="text-sm text-muted">
-              Ask about your sales, stock, and orders — answered from your live
-              data.
-            </p>
-          </div>
-        </div>
+      <div className="flex h-[calc(100dvh-10.75rem)] min-h-[26rem] flex-col gap-3 lg:h-[calc(100dvh-7rem)]">
+        <Link
+          href={`/cafes/${id}`}
+          className="inline-flex w-fit shrink-0 items-center gap-1.5 text-xs text-muted transition-colors hover:text-fg"
+        >
+          <ArrowLeft className="size-3" />
+          Back to {cafe.name}
+        </Link>
 
-        <ManagerChat cafeId={id} />
+        <ManagerChat cafeId={id} cafeName={cafe.name} />
       </div>
     );
   } catch (err) {

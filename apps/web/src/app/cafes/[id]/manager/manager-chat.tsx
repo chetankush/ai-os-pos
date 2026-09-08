@@ -13,6 +13,8 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 interface Props {
   cafeId: string;
+  /** Shown in the slim header so the page needs no separate masthead. */
+  cafeName: string;
 }
 
 type Role = 'user' | 'assistant';
@@ -47,7 +49,7 @@ const EXAMPLE_PROMPTS = [
   'Mark Cold Coffee out of stock',
 ];
 
-export function ManagerChat({ cafeId }: Props) {
+export function ManagerChat({ cafeId, cafeName }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -88,10 +90,11 @@ export function ManagerChat({ cafeId }: Props) {
 
   // Keep the latest message in view as the conversation grows / typing shows.
   useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: 'smooth',
-    });
+    const el = scrollRef.current;
+    if (!el) return;
+    // Someone who has asked the OS for less motion should not be smooth-scrolled.
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollTo({ top: el.scrollHeight, behavior: reduced ? 'auto' : 'smooth' });
   }, [messages, sending]);
 
   async function clearChat() {
@@ -164,10 +167,13 @@ export function ManagerChat({ cafeId }: Props) {
   const isEmpty = messages.length === 0;
 
   return (
-    <Card className="flex h-[70vh] max-h-[640px] flex-col overflow-hidden">
+    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Header — title + clear */}
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5 sm:px-6">
-        <span className="text-sm font-medium">AI manager</span>
+        <span className="min-w-0 truncate text-sm font-medium">
+          <span className="truncate">{cafeName}</span>
+          <span className="text-muted"> · AI manager</span>
+        </span>
         {!isEmpty && (
           <button
             type="button"
@@ -186,7 +192,7 @@ export function ManagerChat({ cafeId }: Props) {
         ref={scrollRef}
         aria-live="polite"
         aria-label="Conversation with your AI manager"
-        className="flex-1 overflow-y-auto p-4 sm:p-6"
+        className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"
       >
         {isEmpty ? (
           <EmptyState onPick={(p) => void send(p)} disabled={sending} />

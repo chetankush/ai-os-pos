@@ -313,7 +313,11 @@ export async function aiConsoleRoutes(
         `You are the AI manager for "${cafe.name}". Help the owner understand and run their cafe.`,
         `ALWAYS use a tool to get real data — never invent numbers.`,
         `Money is in paise; present it as ₹ (divide by 100).`,
-        `Be concise; use short sentences and small lists.`,
+        // "Be concise" alone still produced multi-paragraph answers. A cafe owner
+        // reads this between orders on a counter tablet, so the cap is explicit.
+        `Answer in 3 sentences or fewer, or up to 5 short bullets when listing figures.`,
+        `Lead with the number the owner asked for. No preamble, no restating the question, no closing offer of further help.`,
+        `Only add context or caveats if they change what the owner should do.`,
         `Confirm before destructive actions.`,
         // The product uses lucide icons everywhere; emoji bullets/checkmarks
         // look amateur next to that and were flagged by an audit. Hard rule.
